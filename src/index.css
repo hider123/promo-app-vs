@@ -1,0 +1,4 @@
+/* 引入 Tailwind CSS 的基礎、元件和工具樣式 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
