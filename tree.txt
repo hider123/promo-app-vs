@@ -1,0 +1,40 @@
+Folder PATH listing for volume Acer
+Volume serial number is E2CD-96E3
+C:\USERS\JIWEI\DOCUMENTS\VS\PROMO-APP\SRC
+©¦  App.css
+©¦  App.jsx
+©¦  index.css
+©¦  main.jsx
+©¦  
+©À©¤assets
+©¦      react.svg
+©¦      
+©À©¤components
+©¦      AlertModal.jsx
+©¦      BottomTabBar.jsx
+©¦      ConfirmationModal.jsx
+©¦      GenerationModal.jsx
+©¦      InviteMemberModal.jsx
+©¦      ProductCard.jsx
+©¦      RecordsPage.jsx
+©¦      SearchBar.jsx
+©¦      StyleInjector.jsx
+©¦      
+©À©¤data
+©¦      mockData.js
+©¦      
+©À©¤firebase
+©¦      config.js
+©¦      
+©¸©¤pages
+    ©¦  AuthPage.jsx
+    ©¦  CatPoolPage.jsx
+    ©¦  ProductsPage.jsx
+    ©¦  RecordsPage.jsx
+    ©¦  TeamPage.jsx
+    ©¦  
+    ©¸©¤Account
+            AccountPage.jsx
+            EditProfilePage.jsx
+            TransactionsPage.jsx
+            
