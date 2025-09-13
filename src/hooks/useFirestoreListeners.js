@@ -43,8 +43,11 @@ export const useFirestoreListeners = (appId, userId, isReadyToListen, onInitialL
         // 回傳一個清理函式
         // 當元件卸載或依賴項改變時，React 會自動呼叫這個函式
         return () => {
-            // 遍歷並呼叫所有取消監聽的函式，以斷開與 Firebase 的連線，防止記憶體洩漏
-            unsubscribers.forEach(unsub => unsub());
+            // [修正] 在執行 forEach 之前，先確認 unsubscribers 是一個有效的陣列
+            if (unsubscribers && Array.isArray(unsubscribers)) {
+                // 遍歷並呼叫所有取消監聽的函式，以斷開與 Firebase 的連線，防止記憶體洩漏
+                unsubscribers.forEach(unsub => unsub());
+            }
         };
     }, [isReadyToListen, userId, appId, onInitialLoadComplete]); // 依賴項陣列：當這裡的任何一個值改變時，effect 會重新執行
 

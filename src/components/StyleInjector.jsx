@@ -7,6 +7,9 @@ const StyleInjector = () => (
     :root {
         --tab-bar-height: 60px; /* 定義底部導覽列高度 */
     }
+    html {
+        font-size: 17px; /* [修正] 將基礎字體大小從預設的 16px 放大，影響整個 APP */
+    }
     html, body, #root {
         height: 100%;
         margin: 0;
@@ -43,4 +46,3 @@ const StyleInjector = () => (
 );
 
 export default StyleInjector;
-
