@@ -3,6 +3,7 @@ Volume serial number is E2CD-96E3
 C:\USERS\JIWEI\DOCUMENTS\VS\PROMO-APP\SRC
 ©¦  App.css
 ©¦  App.jsx
+©¦  AppLayout.jsx
 ©¦  index.css
 ©¦  main.jsx
 ©¦  
@@ -16,15 +17,23 @@ C:\USERS\JIWEI\DOCUMENTS\VS\PROMO-APP\SRC
 ©¦      GenerationModal.jsx
 ©¦      InviteMemberModal.jsx
 ©¦      ProductCard.jsx
+©¦      RechargeModal.jsx
 ©¦      RecordsPage.jsx
 ©¦      SearchBar.jsx
 ©¦      StyleInjector.jsx
+©¦      
+©À©¤context
+©¦      DataContext.jsx
 ©¦      
 ©À©¤data
 ©¦      mockData.js
 ©¦      
 ©À©¤firebase
 ©¦      config.js
+©¦      
+©À©¤hooks
+©¦      useAuth.js
+©¦      useFirestoreListeners.js
 ©¦      
 ©¸©¤pages
     ©¦  AuthPage.jsx
