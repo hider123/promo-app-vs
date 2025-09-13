@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithCustomToken } from "firebase/auth";
-import { getFirestore, collection, onSnapshot, writeBatch, doc, addDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, writeBatch, doc, addDoc, deleteDoc, updateDoc } from "firebase/firestore";
 
 // --- 全域變數 ---
 // 為了防止重複初始化，我們將 Firebase 的實例儲存在模組層級的全域變數中
@@ -91,7 +91,53 @@ export const initializeFirebase = async () => {
  * @returns {Array<Function>} 一個包含所有取消監聽函式的陣列。
  */
 export const setupListeners = (appId, userId, listeners, onInitialLoadComplete) => {
-    // ... setupListeners 的邏輯保持不變 ...
+    if (!firestore) throw new Error("Firestore is not initialized.");
+    
+    if (!Array.isArray(listeners)) {
+        console.error("setupListeners expects 'listeners' to be an array, but received:", typeof listeners);
+        if (typeof onInitialLoadComplete === 'function') {
+            onInitialLoadComplete();
+        }
+        return [];
+    }
+
+    let loadCount = 0;
+    const totalListeners = listeners.length;
+
+    const checkAllLoaded = () => {
+        loadCount++;
+        if (loadCount === totalListeners) {
+            onInitialLoadComplete();
+        }
+    };
+
+    return listeners.map(({ name, setter, initialData, isPublic }) => {
+        const path = isPublic
+            ? `artifacts/${appId}/public/data/${name}`
+            : `artifacts/${appId}/users/${userId}/${name}`;
+
+        const q = collection(firestore, path);
+
+        return onSnapshot(q, async (querySnapshot) => {
+            if (querySnapshot.empty && initialData && initialData.length > 0) {
+                console.log(`Seeding '${name}'...`);
+                const batch = writeBatch(firestore);
+                initialData.forEach(item => {
+                    const docRef = doc(collection(firestore, path));
+                    const { id, ...data } = item;
+                    batch.set(docRef, data);
+                });
+                await batch.commit();
+                setter(initialData.map(item => ({ ...item, id: crypto.randomUUID() })));
+            } else {
+                setter(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }
+            if (loadCount < totalListeners) checkAllLoaded();
+        }, (error) => {
+            console.error(`Error fetching ${name}:`, error);
+            if (loadCount < totalListeners) checkAllLoaded();
+        });
+    });
 };
 
 /**
@@ -105,6 +151,28 @@ export const addData = async (path, data, returnRef = false) => {
     if (!firestore) throw new Error("Firestore 尚未初始化。");
     const docRef = await addDoc(collection(firestore, path), data);
     return returnRef ? docRef : docRef.id;
+};
+
+/**
+ * 更新 Firestore 文件的通用函式。
+ * @param {string} path - 集合的路徑。
+ * @param {string} id - 文件的 ID。
+ * @param {object} data - 要更新的資料。
+ */
+export const updateData = async (path, id, data) => {
+    if (!firestore) throw new Error("Firestore 尚未初始化。");
+    const docRef = doc(firestore, path, id);
+    await updateDoc(docRef, data);
+};
+
+/**
+ * 刪除 Firestore 文件的通用函式。
+ * @param {string} path - 集合的路徑。
+ * @param {string} id - 文件的 ID。
+ */
+export const deleteData = async (path, id) => {
+    if (!firestore) throw new Error("Firestore 尚未初始化。");
+    await deleteDoc(doc(firestore, path, id));
 };
 
 /**

@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useData } from '../../context/DataContext.jsx';
 import RechargeModal from '../../components/RechargeModal.jsx';
 
-const AccountPage = ({ onNavigate }) => {
+const AccountPage = ({ onNavigate, setRechargeAmount }) => {
     // 1. 從 Context 取得全域狀態和函式
-    const { records, userId, handleSignOut, handleRecharge, showAlert } = useData();
+    const { records, userId, handleSignOut, showAlert } = useData();
 
     // 2. 管理此頁面自身的 UI 狀態
     const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
@@ -24,19 +24,34 @@ const AccountPage = ({ onNavigate }) => {
     };
     const userLevel = getUserLevel(totalCommissionEarned);
 
+    // [修正] 更新 UserID 格式化函式，將其轉換為純數字
     const formatUserId = (id) => {
-        if (!id || id.length < 8) return id || 'N/A';
-        const firstLetter = String.fromCharCode(65 + (parseInt(id.substring(0, 2), 16) % 26));
-        const secondLetter = String.fromCharCode(65 + (parseInt(id.substring(2, 4), 16) % 26));
-        const lastSixDigits = id.slice(-6);
-        return `${firstLetter}${secondLetter}${lastSixDigits}`;
+        if (!id) return '0000-0000';
+    
+        // 建立一個簡單的雜湊函式，將字母和數字組成的 UID 轉換為一個固定的數字
+        const simpleHash = (str) => {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash |= 0; // 確保結果是一個 32 位元的整數
+            }
+            return Math.abs(hash);
+        };
+
+        // 產生一個 8 位數的數字 ID，不足的前面補 0
+        const numericId = simpleHash(id).toString().padStart(8, '0');
+        
+        // 為了方便閱讀，在中間加上連字號
+        return `${numericId.slice(0, 4)}-${numericId.slice(4, 8)}`;
     };
     const formattedUserId = formatUserId(userId);
     
     // 5. 定義事件處理函式 (Event Handlers)
     const handleConfirmRecharge = (amount) => {
-        handleRecharge(amount);
         setIsRechargeModalOpen(false);
+        setRechargeAmount(amount);
+        onNavigate('paymentChannels');
     };
 
     const handleLinkAccount = (platform) => {
@@ -50,7 +65,7 @@ const AccountPage = ({ onNavigate }) => {
                 <h1 className="text-5xl font-bold text-gray-900">我的帳號</h1>
                 
                 {/* 個人資料區塊 */}
-                <div className="bg-white p-5 rounded-xl shadow-sm">
+                <div className="bg-white p-5 rounded-xl shadow-sm relative">
                     <h2 className="text-2xl font-bold text-gray-800 mb-5">個人資料</h2>
                     <div className="flex items-center space-x-5">
                         <img className="h-20 w-20 rounded-full object-cover" src="https://placehold.co/100x100/e2e8f0/475569?text=頭像" alt="使用者頭像" />
@@ -61,8 +76,8 @@ const AccountPage = ({ onNavigate }) => {
                             </div>
                             <p className="text-lg text-gray-600 truncate">UserID: {userId ? formattedUserId : '正在登入...'}</p>
                         </div>
-                        <button onClick={() => onNavigate('editProfile')} className="text-lg font-bold text-indigo-600 hover:text-indigo-800 flex-shrink-0">編輯</button>
                     </div>
+                    <button onClick={() => onNavigate('editProfile')} className="absolute top-5 right-5 text-lg font-bold text-indigo-600 hover:text-indigo-800 flex-shrink-0">編輯</button>
                 </div>
 
                 {/* 我的交易區塊 */}

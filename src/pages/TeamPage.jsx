@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import InviteMemberModal from '../components/InviteMemberModal';
+import { useData } from '../context/DataContext.jsx'; // 引入 useData 以取得資料
 
-// 團隊管理頁面
-const TeamPage = ({ teamMembers, pendingInvitations, handleInvite }) => {
+const TeamPage = () => {
+    // 從 Context 取得團隊成員、待處理邀請和邀請函式
+    const { teamMembers, pendingInvitations, handleInvite } = useData();
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
     const getRoleStyles = (role) => {
@@ -59,7 +61,6 @@ const TeamPage = ({ teamMembers, pendingInvitations, handleInvite }) => {
         );
     };
 
-    // 使用 useMemo 來避免每次渲染都重新計算樹狀結構
     const treeData = useMemo(() => {
         const memberList = teamMembers || [];
         const admin = memberList.find(m => m.role === '首席顧問');
@@ -74,7 +75,7 @@ const TeamPage = ({ teamMembers, pendingInvitations, handleInvite }) => {
     }, [teamMembers]);
 
     return (
-        <div className="space-y-6 p-4">
+        <>
             <InviteMemberModal 
                 isOpen={isInviteModalOpen}
                 onClose={() => setIsInviteModalOpen(false)}
@@ -83,54 +84,46 @@ const TeamPage = ({ teamMembers, pendingInvitations, handleInvite }) => {
                     setIsInviteModalOpen(false);
                 }}
             />
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold text-gray-800">團隊管理</h1>
-                <button 
-                    onClick={() => setIsInviteModalOpen(true)}
-                    className="py-2 px-4 rounded-md font-semibold text-sm transition-colors duration-300 bg-indigo-600 text-white hover:bg-indigo-700">
-                    <i className="fas fa-user-plus mr-2"></i>邀請新成員
-                </button>
-            </div>
+            <div className="space-y-6 p-4">
+                <div className="flex items-baseline justify-between pr-16">
+                    <h1 className="text-3xl font-bold text-gray-800">團隊管理</h1>
+                    <button 
+                        onClick={() => setIsInviteModalOpen(true)}
+                        className="flex items-center py-2 px-4 rounded-md font-semibold text-sm transition-colors duration-300 bg-indigo-600 text-white hover:bg-indigo-700">
+                        <i className="fas fa-user-plus mr-2"></i>邀請新成員
+                    </button>
+                </div>
 
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">團隊結構圖</h2>
-                <ul>
-                    {treeData ? <TreeNode member={treeData} isLast={true} /> : <p className="text-gray-500 py-4">沒有團隊成員可顯示。</p>}
-                </ul>
-            </div>
-            
-            {(pendingInvitations && pendingInvitations.length > 0) && (
                 <div className="bg-white p-4 rounded-lg shadow-sm">
-                    <h2 className="text-lg font-semibold text-gray-800 mb-4">待處理的邀請</h2>
-                    <ul className="divide-y divide-gray-200">
-                        {pendingInvitations.map(inv => (
-                            <li key={inv.id} className="flex items-center justify-between py-3">
-                                <div className="flex items-center">
-                                    <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mr-4">
-                                        <i className="fas fa-envelope text-gray-400"></i>
-                                    </div>
-                                    <div>
-                                        <p className="font-medium text-gray-800 truncate">{inv.email}</p>
-                                        <p className="text-sm text-gray-500">{inv.role}</p>
-                                    </div>
-                                </div>
-                                <span className="text-sm font-medium text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">{inv.status}</span>
-                            </li>
-                        ))}
+                    <h2 className="text-lg font-semibold text-gray-800 mb-2">團隊結構圖</h2>
+                    <ul>
+                        {treeData ? <TreeNode member={treeData} isLast={true} /> : <p className="text-gray-500 py-4">沒有團隊成員可顯示。</p>}
                     </ul>
                 </div>
-            )}
-
-             <div className="bg-white p-4 rounded-lg shadow-sm">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">團隊設定</h2>
-                <div className="space-y-4">
-                    <div>
-                        <label htmlFor="team-name" className="block text-sm font-medium text-gray-700">團隊名稱</label>
-                        <input type="text" id="team-name" defaultValue="我的優秀團隊" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-gray-50"/>
+                
+                {(pendingInvitations && pendingInvitations.length > 0) && (
+                    <div className="bg-white p-4 rounded-lg shadow-sm">
+                        <h2 className="text-lg font-semibold text-gray-800 mb-4">待處理的邀請</h2>
+                        <ul className="divide-y divide-gray-200">
+                            {pendingInvitations.map(inv => (
+                                <li key={inv.id} className="flex items-center justify-between py-3">
+                                    <div className="flex items-center">
+                                        <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mr-4">
+                                            <i className="fas fa-envelope text-gray-400"></i>
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-gray-800 truncate">{inv.email}</p>
+                                            <p className="text-sm text-gray-500">{inv.role}</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-sm font-medium text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">{inv.status}</span>
+                                </li>
+                            ))}
+                        </ul>
                     </div>
-                </div>
+                )}
             </div>
-        </div>
+        </>
     );
 };
 
