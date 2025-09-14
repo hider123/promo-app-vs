@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { DataProvider, useData } from './context/DataContext.jsx';
-import AppLayout from './AppLayout';
+import { AuthProvider, useAuthContext } from './context/AuthContext.jsx';
+import { UserProvider } from './context/UserContext.jsx';
+import { AdminProvider } from './context/AdminContext.jsx';
+import UserLayout from './layouts/UserLayout.jsx';
+import AdminLayout from './layouts/AdminLayout.jsx';
 import StyleInjector from './components/StyleInjector';
 import AuthPage from './pages/AuthPage';
-import AdminLoginPage from './pages/admin/AdminLoginPage.jsx'; // 引入新的管理員登入頁面
+import AdminLoginPage from './pages/admin/AdminLoginPage.jsx';
 
-// 應用程式內容的渲染邏輯中心
+// AppContent 元件是應用程式的渲染邏輯中心
 const AppContent = () => {
-    // 1. 從 Context 取得所有需要的狀態
-    const { isLoading, user, auth, initError, isAdmin } = useData();
+    // 1. 從最外層的 AuthContext 取得所有認證相關的狀態
+    const { isLoading, user, auth, initError, isAdmin, handleSignOut } = useAuthContext();
 
-    // 2. 追蹤 URL hash (#) 的狀態，以區分一般使用者和管理員
+    // 2. 追蹤 URL hash (#) 的狀態，以區分後台模式
     const [hash, setHash] = useState(window.location.hash);
 
-    // 3. 設定監聽器，當 URL hash 改變時自動更新狀態
     useEffect(() => {
         const handleHashChange = () => setHash(window.location.hash);
         window.addEventListener('hashchange', handleHashChange);
@@ -48,35 +50,49 @@ const AppContent = () => {
         );
     }
 
-    // 狀態三：管理員路由 (URL 包含 #admin)
-    if (hash === '#admin') {
-        // 如果使用者已登入，且是管理員，則顯示主應用
-        if (user && isAdmin) {
-            return <AppLayout />;
-        }
-        // 否則，無論是否登入，一律顯示管理員專用登入頁面
-        return <AdminLoginPage auth={auth} />;
-    }
-    
-    // 狀態四：一般使用者路由
-    // 如果使用者已登入，則顯示主應用
+    // 狀態三：路由判斷
+    const isAdminRoute = hash === '#admin';
+
     if (user) {
-        return <AppLayout />;
+        // --- 使用者已登入 ---
+        if (isAdmin) {
+            // 如果登入者是管理員
+            if (isAdminRoute) {
+                // 且在後台路由 -> 顯示後台 (被 AdminProvider 包裹)
+                return <AdminProvider><AdminLayout /></AdminProvider>;
+            } else {
+                // 雖然是管理員，但在前台路由 -> 顯示前台 (被 UserProvider 包裹)
+                return <UserProvider><UserLayout /></UserProvider>;
+            }
+        } else {
+            // 如果登入者不是管理員
+            if (isAdminRoute) {
+                // 卻試圖進入後台 -> 強制登出並顯示提示
+                handleSignOut();
+                return (
+                    <div className="h-full flex items-center justify-center bg-red-50">
+                        <p>權限不足，正在將您登出...</p>
+                    </div>
+                );
+            }
+            // 一般使用者在前台 -> 顯示前台 (被 UserProvider 包裹)
+            return <UserProvider><UserLayout /></UserProvider>;
+        }
+    } else {
+        // --- 使用者未登入 ---
+        // 根據路由顯示對應的登入頁面
+        return isAdminRoute ? <AdminLoginPage auth={auth} /> : <AuthPage auth={auth} />;
     }
-
-    // 如果使用者未登入，則顯示一般登入/註冊頁面
-    return <AuthPage auth={auth} />;
 }
-
 
 export default function App() {
     return (
-        // 使用 DataProvider 包裹所有內容，確保應用程式的任何部分
-        // 都能透過 useData() Hook 存取到全域狀態
-        <DataProvider>
+        // 使用 AuthProvider 作為最外層的 Provider，
+        // 確保整個應用程式都能存取到最基礎的認證狀態
+        <AuthProvider>
             <StyleInjector />
             <AppContent />
-        </DataProvider>
+        </AuthProvider>
     );
 }
 

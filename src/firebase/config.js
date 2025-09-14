@@ -1,10 +1,11 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithCustomToken } from "firebase/auth";
 import { getFirestore, collection, onSnapshot, writeBatch, doc, addDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 // --- 全域變數 ---
 // 為了防止重複初始化，我們將 Firebase 的實例儲存在模組層級的全域變數中
-let app, authInstance, firestore, currentAppId;
+let app, authInstance, firestore, storage, currentAppId;
 
 // --- 動態設定載入 ---
 /**
@@ -49,7 +50,7 @@ const firebaseConfig = getFirebaseConfig();
  * 初始化 Firebase 服務。
  * 這個函式只負責建立服務實例，並處理一次性的初始權杖登入。
  * 持續的認證狀態監聽由 useAuth Hook 處理。
- * @returns {Promise<object>} 一個包含 authInstance, firestore, currentAppId 的物件。
+ * @returns {Promise<object>} 一個包含 authInstance, firestore, storage, currentAppId 的物件。
  */
 export const initializeFirebase = async () => {
     if (!firebaseConfig) {
@@ -63,6 +64,7 @@ export const initializeFirebase = async () => {
             app = initializeApp(firebaseConfig);
             authInstance = getAuth(app);
             firestore = getFirestore(app);
+            storage = getStorage(app);
             currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         }
 
@@ -75,11 +77,77 @@ export const initializeFirebase = async () => {
         }
         
         // 直接回傳已初始化的服務實例
-        return { authInstance, firestore, currentAppId };
+        return { authInstance, firestore, storage, currentAppId };
     } catch (e) {
         console.error("Firebase 初始化失敗:", e);
         throw e; // 將錯誤向上拋出，讓呼叫它的地方 (useAuth Hook) 可以捕捉到
     }
+};
+
+/**
+ * 上傳檔案到 Firebase Storage 的通用函式。
+ * @param {File} file - 要上傳的檔案。
+ * @param {string} path - 儲存的路徑 (例如: 'products/')。
+ * @param {Function} onProgress - 上傳進度的回呼函式。
+ * @returns {Promise<string>} - 檔案的公開下載 URL。
+ */
+export const uploadFile = (file, path, onProgress) => {
+    return new Promise((resolve, reject) => {
+        if (!storage || !authInstance.currentUser) {
+            return reject(new Error("權限不足：必須登入才能上傳檔案。"));
+        }
+        const storageRef = ref(storage, `${path}${Date.now()}_${file.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                onProgress(progress);
+            },
+            (error) => {
+                console.error("檔案上傳失敗:", error);
+                reject(error);
+            },
+            () => {
+                getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+                    resolve(downloadURL);
+                });
+            }
+        );
+    });
+};
+
+/**
+ * 上傳 Base64 圖片資料到 Firebase Storage 的函式。
+ * @param {string} base64String - Base64 格式的圖片資料。
+ * @param {string} path - 儲存的路徑。
+ * @param {string} fileName - 檔案名稱。
+ * @returns {Promise<string>} - 檔案的公開下載 URL。
+ */
+export const uploadBase64AsFile = (base64String, path, fileName) => {
+    return new Promise(async (resolve, reject) => {
+        if (!storage || !authInstance.currentUser) {
+            return reject(new Error("服務未就緒或未登入。"));
+        }
+        try {
+            const response = await fetch(base64String);
+            const blob = await response.blob();
+            const file = new File([blob], `${fileName.replace(/\s+/g, '_') || 'image'}.png`, { type: 'image/png' });
+            
+            const storageRef = ref(storage, `${path}${Date.now()}_${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed',
+                () => {}, // 我們在這裡不需要進度回報
+                (error) => reject(error),
+                () => {
+                    getDownloadURL(uploadTask.snapshot.ref).then(resolve);
+                }
+            );
+        } catch (error) {
+            reject(error);
+        }
+    });
 };
 
 /**
@@ -94,7 +162,6 @@ export const setupListeners = (appId, userId, listeners, onInitialLoadComplete) 
     if (!firestore) throw new Error("Firestore is not initialized.");
     
     if (!Array.isArray(listeners)) {
-        console.error("setupListeners expects 'listeners' to be an array, but received:", typeof listeners);
         if (typeof onInitialLoadComplete === 'function') {
             onInitialLoadComplete();
         }
@@ -115,12 +182,9 @@ export const setupListeners = (appId, userId, listeners, onInitialLoadComplete) 
         const path = isPublic
             ? `artifacts/${appId}/public/data/${name}`
             : `artifacts/${appId}/users/${userId}/${name}`;
-
         const q = collection(firestore, path);
-
         return onSnapshot(q, async (querySnapshot) => {
             if (querySnapshot.empty && initialData && initialData.length > 0) {
-                console.log(`Seeding '${name}'...`);
                 const batch = writeBatch(firestore);
                 initialData.forEach(item => {
                     const docRef = doc(collection(firestore, path));
@@ -142,10 +206,6 @@ export const setupListeners = (appId, userId, listeners, onInitialLoadComplete) 
 
 /**
  * 向指定的 Firestore 集合新增一筆文件。
- * @param {string} path - 集合的路徑。
- * @param {object} data - 要新增的資料。
- * @param {boolean} returnRef - 是否返回文件的引用而非 ID。
- * @returns {Promise<string|object>} 新文件的 ID 或引用。
  */
 export const addData = async (path, data, returnRef = false) => {
     if (!firestore) throw new Error("Firestore 尚未初始化。");
@@ -155,9 +215,6 @@ export const addData = async (path, data, returnRef = false) => {
 
 /**
  * 更新 Firestore 文件的通用函式。
- * @param {string} path - 集合的路徑。
- * @param {string} id - 文件的 ID。
- * @param {object} data - 要更新的資料。
  */
 export const updateData = async (path, id, data) => {
     if (!firestore) throw new Error("Firestore 尚未初始化。");
@@ -167,8 +224,6 @@ export const updateData = async (path, id, data) => {
 
 /**
  * 刪除 Firestore 文件的通用函式。
- * @param {string} path - 集合的路徑。
- * @param {string} id - 文件的 ID。
  */
 export const deleteData = async (path, id) => {
     if (!firestore) throw new Error("Firestore 尚未初始化。");
@@ -177,7 +232,6 @@ export const deleteData = async (path, id) => {
 
 /**
  * 根據文件引用刪除 Firestore 中的文件。
- * @param {object} docRef - 文件的引用。
  */
 export const deleteDataByRef = async (docRef) => {
     if (!firestore) throw new Error("Firestore 尚未初始化。");

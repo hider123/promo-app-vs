@@ -1,12 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import InviteMemberModal from '../components/InviteMemberModal';
-import { useData } from '../context/DataContext.jsx'; // 引入 useData 以取得資料
+// [修正] 更新為正確的相對路徑，只返回一層目錄
+import { useUserContext } from '../context/UserContext.jsx';
 
 const TeamPage = () => {
-    // 從 Context 取得團隊成員、待處理邀請和邀請函式
-    const { teamMembers, pendingInvitations, handleInvite } = useData();
+    // 1. 從 Context 取得所需的資料和函式
+    const { teamMembers, pendingInvitations, handleInvite } = useUserContext();
+    
+    // 2. 管理此頁面自身的 UI 狀態 (彈出視窗的開關)
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
+    // 3. 定義輔助函式 (Helper Function)，根據角色回傳對應的樣式
     const getRoleStyles = (role) => {
         switch (role) {
             case '首席顧問':
@@ -21,7 +25,7 @@ const TeamPage = () => {
         }
     };
 
-    // TreeNode 是一個遞迴元件，用來渲染團隊結構
+    // 4. 定義一個遞迴的子元件 (Sub-component)，用來渲染樹狀結構
     const TreeNode = ({ member, isLast }) => {
         const [isOpen, setIsOpen] = useState(true);
         const hasChildren = member.children && member.children.length > 0;
@@ -61,6 +65,7 @@ const TeamPage = () => {
         );
     };
 
+    // 5. 計算衍生資料 (Derived Data)，將扁平的團隊列表轉換為樹狀結構
     const treeData = useMemo(() => {
         const memberList = teamMembers || [];
         const admin = memberList.find(m => m.role === '首席顧問');
@@ -74,6 +79,7 @@ const TeamPage = () => {
         };
     }, [teamMembers]);
 
+    // 6. 回傳最終的 JSX 結構
     return (
         <>
             <InviteMemberModal 
@@ -101,7 +107,7 @@ const TeamPage = () => {
                     </ul>
                 </div>
                 
-                {(pendingInvitations && pendingInvitations.length > 0) && (
+                {(pendingInvitations || []).length > 0 && (
                     <div className="bg-white p-4 rounded-lg shadow-sm">
                         <h2 className="text-lg font-semibold text-gray-800 mb-4">待處理的邀請</h2>
                         <ul className="divide-y divide-gray-200">

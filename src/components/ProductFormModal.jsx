@@ -7,7 +7,7 @@ const ProductFormModal = ({ isOpen, onClose, product, onAdd, onUpdate }) => {
         description: '',
         price: '',
         rating: '4.5',
-        image: 'https://placehold.co/600x400/ede9fe/5b21b6?text=商品',
+        image: '', // 預設為空字串
         tag: { text: '新品', color: 'bg-blue-500' }
     });
 
@@ -21,7 +21,7 @@ const ProductFormModal = ({ isOpen, onClose, product, onAdd, onUpdate }) => {
             // 如果沒有傳入 product prop，代表是「新增模式」，重設表單為預設的空值
             setFormData({
                 name: '', description: '', price: '', rating: '4.5',
-                image: 'https://placehold.co/600x400/ede9fe/5b21b6?text=商品',
+                image: '',
                 tag: { text: '新品', color: 'bg-blue-500' }
             });
         }
@@ -63,8 +63,12 @@ const ProductFormModal = ({ isOpen, onClose, product, onAdd, onUpdate }) => {
                                 <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required />
                             </div>
                             <div>
-                                <label htmlFor="price" className="block text-sm font-medium text-gray-700">價格 (例如：NT$1,280)</label>
+                                <label htmlFor="price" className="block text-sm font-medium text-gray-700">價格 (例如：US$39.99)</label>
                                 <input type="text" name="price" id="price" value={formData.price} onChange={handleChange} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required />
+                            </div>
+                            <div>
+                                <label htmlFor="image" className="block text-sm font-medium text-gray-700">商品照片 URL</label>
+                                <input type="url" name="image" id="image" value={formData.image} onChange={handleChange} placeholder="https://example.com/image.png" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required />
                             </div>
                             <div>
                                 <label htmlFor="description" className="block text-sm font-medium text-gray-700">簡短描述</label>

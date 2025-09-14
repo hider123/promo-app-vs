@@ -1,53 +1,49 @@
 import React, { useState } from 'react';
-import { useData } from '../../context/DataContext.jsx';
+// [修正] 引入新的 Context Hooks
+import { useUserContext } from '../../context/UserContext.jsx';
+import { useAuthContext } from '../../context/AuthContext.jsx';
 import RechargeModal from '../../components/RechargeModal.jsx';
 
 const AccountPage = ({ onNavigate, setRechargeAmount }) => {
-    // 1. 從 Context 取得全域狀態和函式
-    const { records, userId, handleSignOut, showAlert } = useData();
-
+    // 1. 從各自的 Context 取得資料
+    const { handleSignOut, userId } = useAuthContext();
+    const { records, showAlert } = useUserContext();
+    
     // 2. 管理此頁面自身的 UI 狀態
     const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
 
-    // 3. 計算衍生資料 (Derived Data)
+    // 3. 計算衍生資料
     const totalBalance = (records || []).reduce((sum, r) => sum + (r.amount || 0), 0);
     const totalCommissionEarned = (records || []).filter(r => r.type === 'commission' && r.amount > 0).reduce((sum, r) => sum + r.amount, 0);
-    const pendingCommission = 150.00;
+    const pendingCommission = 5.00;
     const withdrawableBalance = totalBalance > pendingCommission ? totalBalance - pendingCommission : 0;
 
-    // 4. 定義輔助函式 (Helper Functions)
+    // 4. 定義輔助函式
     const getUserLevel = (commission) => {
-        if (commission >= 50000) return { name: '首席顧問', color: 'bg-indigo-100 text-indigo-800' };
-        if (commission >= 10000) return { name: '資深總監', color: 'bg-purple-100 text-purple-800' };
-        if (commission >= 2000) return { name: '推廣經理', color: 'bg-sky-100 text-sky-800' };
+        if (commission >= 1500) return { name: '首席顧問', color: 'bg-indigo-100 text-indigo-800' };
+        if (commission >= 300) return { name: '資深總監', color: 'bg-purple-100 text-purple-800' };
+        if (commission >= 60) return { name: '推廣經理', color: 'bg-sky-100 text-sky-800' };
         return { name: '行銷專員', color: 'bg-teal-100 text-teal-800' };
     };
     const userLevel = getUserLevel(totalCommissionEarned);
 
-    // [修正] 更新 UserID 格式化函式，將其轉換為純數字
     const formatUserId = (id) => {
         if (!id) return '0000-0000';
-    
-        // 建立一個簡單的雜湊函式，將字母和數字組成的 UID 轉換為一個固定的數字
         const simpleHash = (str) => {
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
                 const char = str.charCodeAt(i);
                 hash = ((hash << 5) - hash) + char;
-                hash |= 0; // 確保結果是一個 32 位元的整數
+                hash |= 0;
             }
             return Math.abs(hash);
         };
-
-        // 產生一個 8 位數的數字 ID，不足的前面補 0
         const numericId = simpleHash(id).toString().padStart(8, '0');
-        
-        // 為了方便閱讀，在中間加上連字號
         return `${numericId.slice(0, 4)}-${numericId.slice(4, 8)}`;
     };
     const formattedUserId = formatUserId(userId);
     
-    // 5. 定義事件處理函式 (Event Handlers)
+    // 5. 定義事件處理函式
     const handleConfirmRecharge = (amount) => {
         setIsRechargeModalOpen(false);
         setRechargeAmount(amount);
@@ -58,13 +54,12 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
         showAlert(`🎉 ${platform} 帳號連結成功！`);
     };
 
-    // 6. 回傳 JSX 結構來渲染 UI
+    // 6. 回傳 JSX
     return (
         <>
             <div className="space-y-8 p-4">
-                <h1 className="text-5xl font-bold text-gray-900">我的帳號</h1>
+                <h1 className="text-5xl font-bold text-gray-900">我的帳戶</h1>
                 
-                {/* 個人資料區塊 */}
                 <div className="bg-white p-5 rounded-xl shadow-sm relative">
                     <h2 className="text-2xl font-bold text-gray-800 mb-5">個人資料</h2>
                     <div className="flex items-center space-x-5">
@@ -74,25 +69,24 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                                 <p className="font-bold text-2xl text-gray-900">PromoMaster</p>
                                 <span className={`${userLevel.color} text-sm font-semibold px-3 py-1 rounded-full`}>{userLevel.name}</span>
                             </div>
-                            <p className="text-lg text-gray-600 truncate">UserID: {userId ? formattedUserId : '正在登入...'}</p>
+                            <p className="text-lg text-gray-600 truncate">UserID: {userId ? formattedUserId : '登入中...'}</p>
                         </div>
                     </div>
                     <button onClick={() => onNavigate('editProfile')} className="absolute top-5 right-5 text-lg font-bold text-indigo-600 hover:text-indigo-800 flex-shrink-0">編輯</button>
                 </div>
 
-                {/* 我的交易區塊 */}
                 <div className="bg-white p-6 rounded-xl shadow-sm text-center">
                     <div className="flex items-center justify-between mb-5">
                         <h2 className="text-2xl font-bold text-gray-800">我的交易</h2>
                         <button onClick={() => onNavigate('transactions')} className="text-lg font-bold text-indigo-600 hover:text-indigo-800">
-                            查看詳細紀錄 <i className="fas fa-arrow-right ml-1"></i>
+                            查看詳細記錄 <i className="fas fa-arrow-right ml-1"></i>
                         </button>
                     </div>
                     <p className="text-lg font-semibold text-gray-500">目前總餘額</p>
-                    <p className="text-6xl font-extrabold text-indigo-600 my-2 tracking-tight">NT$ {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-6xl font-extrabold text-indigo-600 my-2 tracking-tight">US$ {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     <div className="flex justify-center items-center text-lg text-gray-600 divide-x divide-gray-400">
-                        <div className="px-5">可提領: <span className="font-bold">NT$ {withdrawableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                        <div className="px-5">待處理: <span className="font-bold">NT$ {pendingCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                        <div className="px-5">可提領: <span className="font-bold">US$ {withdrawableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                        <div className="px-5">待處理: <span className="font-bold">US$ {pendingCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                     </div>
                     <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8">
                         <button className="w-full max-w-xs py-3 rounded-lg font-bold transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300 text-xl">
@@ -106,7 +100,6 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                     </div>
                 </div>
 
-                {/* 已連結的社群帳號區塊 */}
                 <div className="bg-white p-5 rounded-xl shadow-sm">
                     <h2 className="text-2xl font-bold text-gray-800 mb-4">已連結的社群帳號</h2>
                      <ul className="divide-y divide-gray-200">
@@ -134,7 +127,6 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                     </ul>
                 </div>
 
-                {/* 登出按鈕 */}
                 <div className="pt-2">
                     <button 
                         onClick={handleSignOut} 
@@ -144,7 +136,6 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                 </div>
             </div>
 
-            {/* 渲染儲值彈出視窗 */}
             <RechargeModal
                 isOpen={isRechargeModalOpen}
                 onClose={() => setIsRechargeModalOpen(false)}

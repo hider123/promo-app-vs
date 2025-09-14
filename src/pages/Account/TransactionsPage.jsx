@@ -1,37 +1,34 @@
 import React, { useState, useMemo } from 'react';
-import { useData } from '../../context/DataContext.jsx';
-import RechargeModal from '../../components/RechargeModal.jsx'; // 引入儲值彈出視窗元件
+// [核心修正] 引入新的 UserContext Hook
+import { useUserContext } from '../../context/UserContext.jsx';
+import RechargeModal from '../../components/RechargeModal.jsx';
 
 const TransactionsPage = ({ onBack }) => {
-    // 1. 從 Context 取得全域狀態和函式
-    const { records, handleRecharge } = useData();
+    // 1. [核心修正] 從 useUserContext 取得資料和函式
+    const { records, handleRecharge } = useUserContext();
     
     // 2. 管理此頁面自身的 UI 狀態
     const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
 
     // 3. 計算衍生資料 (Derived Data)
-    // 使用 useMemo 進行排序，只有在 records 改變時才會重新計算，以優化效能
     const sortedRecords = useMemo(() => {
-        // 建立一個 records 陣列的副本來排序，避免直接修改原始資料
         return [...(records || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
     }, [records]);
     
-    // 計算總餘額、待處理佣金和可提領餘額
     const totalBalance = (records || []).reduce((sum, r) => sum + (r.amount || 0), 0);
-    const pendingCommission = 150.00; // 假設待處理佣金為固定值
+    const pendingCommission = 5.00;
     const withdrawableBalance = totalBalance > pendingCommission ? totalBalance - pendingCommission : 0;
 
-    // 4. 定義事件處理函式 (Event Handlers)
+    // 4. 定義事件處理函式
     const handleConfirmRecharge = (amount) => {
-        handleRecharge(amount); // 呼叫來自 Context 的儲值函式
-        setIsRechargeModalOpen(false); // 關閉彈出視窗
+        handleRecharge(amount);
+        setIsRechargeModalOpen(false);
     };
 
-    // 5. 回傳 JSX 結構來渲染 UI
+    // 5. 回傳 JSX 結構
     return (
         <>
             <div className="p-4 space-y-6">
-                {/* 頁面標頭 */}
                 <div className="relative flex items-center justify-center">
                     <button onClick={onBack} className="absolute left-0 text-indigo-600 hover:text-indigo-800" aria-label="返回上一頁">
                         <i className="fas fa-arrow-left fa-lg"></i>
@@ -39,13 +36,12 @@ const TransactionsPage = ({ onBack }) => {
                     <h1 className="text-2xl font-bold text-gray-800">我的交易</h1>
                 </div>
                 
-                {/* 餘額總覽與操作按鈕 */}
                 <div className="bg-white p-6 rounded-lg shadow-sm text-center">
                     <p className="text-sm font-medium text-gray-500">目前總餘額</p>
-                    <p className="text-4xl font-bold text-indigo-600 my-2">NT$ {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-4xl font-bold text-indigo-600 my-2">US$ {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     <div className="flex justify-center items-center text-sm text-gray-600 divide-x divide-gray-300">
-                        <div className="px-4">可提領: <span className="font-semibold">NT$ {withdrawableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                        <div className="px-4">待處理: <span className="font-semibold">NT$ {pendingCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                        <div className="px-4">可提領: <span className="font-semibold">US$ {withdrawableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                        <div className="px-4">待處理: <span className="font-semibold">US$ {pendingCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                     </div>
                     <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-6">
                         <button className="w-full max-w-xs py-3 rounded-lg font-semibold transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300">
@@ -59,9 +55,8 @@ const TransactionsPage = ({ onBack }) => {
                     </div>
                 </div>
 
-                {/* 交易紀錄列表 */}
                 <div className="bg-white rounded-lg shadow-sm">
-                     <h2 className="text-lg font-semibold text-gray-800 p-4 border-b">交易紀錄</h2>
+                     <h2 className="text-lg font-semibold text-gray-800 p-4 border-b">交易記錄</h2>
                      <ul className="divide-y divide-gray-200">
                         {sortedRecords.map((record) => {
                             const isExpense = record.amount < 0;
@@ -77,7 +72,7 @@ const TransactionsPage = ({ onBack }) => {
                                         </div>
                                     </div>
                                     <div className={`font-semibold ${record.type === 'deposit' ? 'text-blue-600' : (isExpense ? 'text-red-600' : 'text-green-600')}`}>
-                                        {`${record.amount > 0 ? '+' : ''} NT$${Math.abs(record.amount || 0).toFixed(2)}`}
+                                        {`${record.amount > 0 ? '+' : ''} US$${Math.abs(record.amount || 0).toFixed(2)}`}
                                     </div>
                                 </li>
                             )
@@ -86,7 +81,6 @@ const TransactionsPage = ({ onBack }) => {
                 </div>
             </div>
 
-            {/* 渲染儲值彈出視窗 */}
             <RechargeModal
                 isOpen={isRechargeModalOpen}
                 onClose={() => setIsRechargeModalOpen(false)}

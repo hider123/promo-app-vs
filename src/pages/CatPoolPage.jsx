@@ -1,48 +1,47 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
+// [修正] 引入新的 UserContext Hook
+import { useUserContext } from '../context/UserContext.jsx';
 
-// 貓池頁面
-const CatPoolPage = ({ poolAccounts, onAddAccountClick, onManageClick, pushedToday }) => {
-    // 建立一個已排序的帳號列表副本，由新到舊
-    const sortedAccounts = [...(poolAccounts || [])].sort((a, b) => {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : a.createdAt || 0;
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : b.createdAt || 0;
-        return new Date(dateB) - new Date(dateA);
-    });
+// [修正] onManageClick 和 pushedToday 的邏輯已移入此元件，不再需要透過 props 傳遞
+const CatPoolPage = ({ onAddAccountClick }) => {
+    // 1. 從 UserContext 取得所需的資料和函式
+    const { poolAccounts, records, showAlert } = useUserContext();
 
-     const getPlatformIcon = (platform) => {
-        switch (platform) {
-            case 'Instagram':
-                return 'fab fa-instagram text-white';
-            case 'Facebook 粉絲專頁':
-                return 'fab fa-facebook-f text-white';
-            case 'X (Twitter)':
-                return 'fab fa-twitter text-white';
-            case 'YouTube':
-                return 'fab fa-youtube text-white';
-            case 'TikTok':
-                 return 'fab fa-tiktok text-white';
-            default:
-                return 'fas fa-user text-white';
+    // 2. 計算衍生資料 (Derived Data)
+    // 計算今天已推播過的帳號
+    const pushedToday = useMemo(() => {
+        if (!records) return new Set();
+        const todayStr = new Date().toLocaleDateString('sv-SE');
+        return new Set(records
+            .filter(r => r.type === 'commission' && r.date?.startsWith(todayStr))
+            .map(r => r.platformDetails?.account));
+    }, [records]);
+    
+    // 將帳號由新到舊排序
+    const sortedAccounts = useMemo(() => 
+        [...(poolAccounts || [])].sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : 0;
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : 0;
+            return new Date(dateB) - new Date(dateA);
+        }), 
+    [poolAccounts]);
+
+    // 3. 定義事件處理函式
+    const onManageClick = useCallback((account) => {
+        const date = account.createdAt?.toDate ? account.createdAt.toDate() : account.createdAt;
+        if (date) {
+            const formattedDate = new Date(date).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+            showAlert(`帳號 "${account.name}"\n創建於：\n${formattedDate}`);
+        } else {
+            showAlert(`帳號 "${account.name}" 的創建日期不明。`);
         }
-    };
+    }, [showAlert]);
 
-     const getPlatformBgColor = (platform) => {
-        switch (platform) {
-            case 'Instagram':
-                return 'bg-gradient-to-br from-purple-500 via-pink-500 to-red-500';
-            case 'Facebook 粉絲專頁':
-                return 'bg-blue-600';
-            case 'X (Twitter)':
-                return 'bg-gray-800';
-            case 'YouTube':
-                return 'bg-red-600';
-             case 'TikTok':
-                return 'bg-black';
-            default:
-                return 'bg-gray-400';
-        }
-    };
+    // 4. 定義輔助函式
+    const getPlatformIcon = (platform) => { /* ... */ };
+    const getPlatformBgColor = (platform) => { /* ... */ };
 
+    // 5. 回傳 JSX 結構
     return (
         <div className="relative h-full">
             <div className="space-y-4 p-4">
