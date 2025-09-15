@@ -15,8 +15,8 @@ export const UserProvider = ({ children }) => {
     const { user, userId, appId } = useAuthContext();
     
     // b. 監聽所有「使用者專屬」和「公開」的資料集合
-    const { products, poolAccounts, teamMembers, pendingInvitations, records } = useFirestoreListeners(
-        'user', // scope
+    const { products, poolAccounts, teamMembers, pendingInvitations, records, appSettings } = useFirestoreListeners(
+        'user',
         appId,
         userId,
         !!user, // 只有在 user 物件存在時，才開始監聽
@@ -60,7 +60,10 @@ export const UserProvider = ({ children }) => {
     };
 
     const handleAddAccount = async () => {
-        if (!userId || !appId) return;
+        if (!userId || !appId || !appSettings) return;
+
+        const catPoolPrice = appSettings.catPoolPrice || 5.00;
+
         const namePrefixes = ['Creative', 'Digital', 'Awesome', 'Super', 'Pro', 'Global'];
         const nameSuffixes = ['Creator', 'Mind', 'Guru', 'World', 'Expert', 'Hub'];
         const platforms = ['Instagram', 'TikTok', 'YouTube', 'Facebook 粉絲專頁', 'X (Twitter)'];
@@ -76,7 +79,7 @@ export const UserProvider = ({ children }) => {
             type: 'expense',
             description: `費用: 購買貓池帳號 (${newAccountData.name})`,
             date: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16).replace('T', ' '),
-            amount: -5.00, // 費用為 5 美元
+            amount: -catPoolPrice,
             status: '成功',
         };
         
@@ -116,6 +119,7 @@ export const UserProvider = ({ children }) => {
     // f. 組合所有要提供給前台子元件的 value
     const value = {
         products,
+        appSettings,
         poolAccounts,
         teamMembers,
         pendingInvitations,

@@ -1,9 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
-// [修正] 直接從 firebase/config 匯入 addData 函式
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+// [核心修正] 引入新的 Context Hooks
+import { useUserContext } from '../context/UserContext.jsx';
+import { useAuthContext } from '../context/AuthContext.jsx';
 import { addData } from '../firebase/config';
 
-// [修正] 移除 db prop，因為不再需要從 App.jsx 傳遞
-const GenerationModal = ({ product, isOpen, onClose, onPushSuccess, poolAccounts, userId, appId, pushedToday }) => {
+const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
+    // 1. 從各自的 Context 取得所需的資料和函式
+    const { poolAccounts, records, appSettings } = useUserContext();
+    const { userId, appId } = useAuthContext();
+    
+    // 2. 管理此元件自身的 UI 狀態
     const [isLoading, setIsLoading] = useState(true);
     const [generatedText, setGeneratedText] = useState('');
     const [activePlatform, setActivePlatform] = useState('Amazon');
@@ -14,11 +20,19 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess, poolAccounts
     const [pushSuccess, setPushSuccess] = useState(false);
     const [pushAccount, setPushAccount] = useState(null);
     const [pushProgress, setPushProgress] = useState(0);
-
-    const [recordReady, setRecordReady] = useState(false);
     
+    // 3. 計算衍生資料
+    const pushedToday = useMemo(() => {
+        if (!records) return new Set();
+        const todayStr = new Date().toLocaleDateString('sv-SE');
+        return new Set(records
+            .filter(r => r.type === 'commission' && r.date?.startsWith(todayStr))
+            .map(r => r.platformDetails?.account));
+    }, [records]);
+
     const availableAccounts = (poolAccounts || []).filter(acc => !pushedToday.has(acc.name));
 
+    // 4. 定義核心函式
     const generateAIContent = useCallback((prod, platform) => {
         if (!prod) return '';
         const { name, description } = prod;
@@ -59,66 +73,79 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess, poolAccounts
         setPushAccount(selectedAcc);
         setModalView('pushing');
     };
-
+    
+    // 5. 使用 useEffect 處理副作用
     useEffect(() => {
         if (isOpen && modalView === 'generate') {
             startGenerationProcess();
         }
     }, [isOpen, modalView, startGenerationProcess]);
 
+    // [核心修正] 將推播模擬和新增紀錄的邏輯合併到一個穩定的 Effect 中
     useEffect(() => {
+        // 只有在 'pushing' 畫面且 pushAccount 已設定時，才執行此 Effect
         if (modalView !== 'pushing' || !pushAccount) return;
         
+        let isCancelled = false;
+        let progress = 0;
         setPushSuccess(false);
         setPushProgress(0);
-        setRecordReady(false); 
 
-        const interval = setInterval(() => {
-            setPushProgress(prev => {
-                if (prev >= 98) {
+        const simulatePush = async () => {
+            // 模擬進度條
+            const interval = setInterval(() => {
+                if (isCancelled) {
                     clearInterval(interval);
-                    setPushSuccess(true);
-                    setRecordReady(true);
-                    return 100;
+                    return;
                 }
-                return prev + 10;
-            });
-        }, 200);
+                progress += 20;
+                setPushProgress(progress);
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    if (isCancelled) return;
+
+                    // 進度條完成後，新增紀錄
+                    const commissionValue = appSettings?.copyPushCommission || 1.50;
+                    const newRecord = {
+                        type: 'commission',
+                        description: `佣金: ${product.name}`,
+                        date: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16).replace('T', ' '),
+                        amount: commissionValue,
+                        status: '成功',
+                        platformDetails: {
+                            product: product.name,
+                            account: pushAccount.name,
+                            platform: pushAccount.platform,
+                            targetPlatform: activePlatform
+                        }
+                    };
+                    
+                    try {
+                        // 這個 await 確保了紀錄被新增
+                        addData(`artifacts/${appId}/users/${userId}/records`, newRecord);
+                        if (!isCancelled) {
+                            setPushSuccess(true);
+                            // 延遲一段時間後才跳轉，讓使用者能看到成功訊息
+                            setTimeout(() => {
+                                if (!isCancelled) onPushSuccess();
+                            }, 1500);
+                        }
+                    } catch (error) {
+                        console.error("新增紀錄失敗: ", error);
+                    }
+                }
+            }, 300);
+        };
+
+        simulatePush();
         
-        return () => clearInterval(interval);
+        // 清理函式：當元件卸載或依賴項改變時，確保非同步操作被取消
+        return () => {
+            isCancelled = true;
+        };
 
+    // [核心修正] 依賴項只包含 modalView 和 pushAccount，確保這個 Effect 只會在確認推播時執行一次
     }, [modalView, pushAccount]);
-
-    useEffect(() => {
-        if (recordReady && pushAccount) {
-            const priceValue = parseFloat(product.price.replace(/NT\$|,/g, ''));
-            const commissionValue = (priceValue * 0.05);
-
-            const newRecord = {
-                type: 'commission',
-                description: `佣金: ${product.name}`,
-                date: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16).replace('T', ' '),
-                amount: commissionValue,
-                status: '成功',
-                platformDetails: {
-                    product: product.name,
-                    account: pushAccount.name,
-                    platform: pushAccount.platform,
-                    targetPlatform: activePlatform
-                }
-            };
-            
-            // [修正] 直接呼叫從 config 匯入的 addData 函式
-            addData(`artifacts/${appId}/users/${userId}/records`, newRecord)
-                .then(() => {
-                    setTimeout(() => {
-                        onPushSuccess();
-                    }, 1500);
-                })
-                .catch(error => console.error("Error adding record to Firestore: ", error))
-                .finally(() => setRecordReady(false));
-        }
-    }, [recordReady, pushAccount, product, userId, appId, onPushSuccess, activePlatform]);
 
 
     useEffect(() => {
@@ -131,7 +158,6 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess, poolAccounts
                 setIsLoading(true);
                 setPushAccount(null);
                 setPushProgress(0);
-                setRecordReady(false); 
             }, 300);
             return () => clearTimeout(timer);
         }
@@ -141,7 +167,8 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess, poolAccounts
         setActivePlatform(platform);
         setGeneratedText(generateAIContent(product, platform));
     };
-
+    
+    // 6. 根據 modalView 渲染不同的內部畫面
     const renderContent = () => {
         if (modalView === 'pushing') {
             return (
@@ -150,7 +177,7 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess, poolAccounts
                         <>
                             <i className="fas fa-check-circle fa-3x text-green-500"></i>
                             <h4 className="text-xl font-semibold mt-4">推播成功！</h4>
-                            <p className="text-gray-600 mt-2">文案已成功發佈至：</p>
+                            <p className="text-gray-600 mt-2">文案已成功發布至：</p>
                             <div className="mt-4 inline-flex items-center bg-gray-100 rounded-lg p-2">
                                 {pushAccount && <img src={pushAccount.avatar} className="w-8 h-8 rounded-full" alt={pushAccount.name}/>}
                                 <span className="ml-3 font-semibold text-gray-800">{pushAccount ? pushAccount.name : ''}</span>
@@ -167,7 +194,7 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess, poolAccounts
                                 </div>
                             )}
                             <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
-                                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${pushProgress}%`, transition: 'width 0.2s' }}></div>
+                                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${pushProgress}%`, transition: 'width 0.3s' }}></div>
                             </div>
                         </>
                     )}
@@ -237,7 +264,7 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess, poolAccounts
                     </div>
                 </div>
                 <textarea value={generatedText} onChange={(e) => setGeneratedText(e.target.value)} rows="8" className="w-full p-3 text-gray-700 bg-gray-100 border border-gray-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-                <p className="text-xs text-gray-500 mt-2 text-center">💡 提醒：發佈時請記得加上 <span className="font-semibold text-indigo-600">#廣告</span> 標籤。</p>
+                <p className="text-xs text-gray-500 mt-2 text-center">💡 提醒：發布時請記得加上 <span className="font-semibold text-indigo-600">#廣告</span> 標籤。</p>
             </>
         );
     };

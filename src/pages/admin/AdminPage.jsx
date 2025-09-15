@@ -1,22 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAdminContext } from '../../context/AdminContext.jsx';
 import ProductFormModal from '../../components/ProductFormModal.jsx';
 import AIScoutModal from '../../components/AIScoutModal.jsx';
+import SmartImage from '../../components/SmartImage.jsx';
+
+// [新增] 一個專為表格設計的倒數計時元件
+const CountdownCell = ({ createdAt }) => {
+    const calculateTimeLeft = (creationDate) => {
+        if (!creationDate) return null;
+        
+        let dateObj;
+        if (creationDate && typeof creationDate.toDate === 'function') {
+            dateObj = creationDate.toDate();
+        } else if (typeof creationDate === 'string') {
+            dateObj = new Date(creationDate);
+        } else {
+            return null;
+        }
+
+        const targetDate = dateObj.getTime() + 2 * 24 * 60 * 60 * 1000;
+        const now = new Date().getTime();
+        const difference = targetDate - now;
+
+        if (difference <= 0) return { expired: true };
+
+        return {
+            days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+            hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+            minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+            seconds: Math.floor((difference % (1000 * 60)) / 1000),
+            expired: false,
+        };
+    };
+
+    const [timeLeft, setTimeLeft] = useState(calculateTimeLeft(createdAt));
+
+    useEffect(() => {
+        if (!createdAt || timeLeft?.expired) return;
+        const timer = setInterval(() => {
+            setTimeLeft(calculateTimeLeft(createdAt));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [createdAt, timeLeft?.expired]);
+
+    if (!timeLeft) return <span className="text-gray-400">-</span>;
+    if (timeLeft.expired) return <span className="font-medium text-red-500">已結束</span>;
+    
+    return (
+        <span className="font-mono text-xs">
+            {timeLeft.days}d {String(timeLeft.hours).padStart(2, '0')}h {String(timeLeft.minutes).padStart(2, '0')}m {String(timeLeft.seconds).padStart(2, '0')}s
+        </span>
+    );
+};
+
 
 const AdminPage = () => {
-    // 1. 從 AdminContext 取得所需的資料和函式
     const { products, handleAddProduct, handleUpdateProduct, handleDeleteProduct } = useAdminContext();
-    
-    // 2. 管理此頁面的 UI 狀態
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     
-    // AI 相關狀態
     const [isScoutModalOpen, setIsScoutModalOpen] = useState(false);
     const [scoutKeyword, setScoutKeyword] = useState('');
     const [searchKeyword, setSearchKeyword] = useState('');
 
-    // 3. 定義事件處理函式
     const handleOpenAddModal = () => {
         setEditingProduct(null);
         setIsFormModalOpen(true);
@@ -39,18 +85,10 @@ const AdminPage = () => {
             handleDeleteProduct(productId);
         }
     };
-    
-    // [新增] 處理圖片載入失敗的函式
-    const handleImageError = (e) => {
-        const productName = e.target.alt || '商品';
-        e.target.src = `https://placehold.co/100x100/e2e8f0/475569?text=${encodeURIComponent(productName)}`;
-    };
 
-    // 4. 回傳 JSX 結構
     return (
         <>
             <div className="p-4 space-y-6">
-                {/* AI 商品偵察員區塊 */}
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                     <h2 className="text-lg font-semibold text-gray-800">AI 商品偵察員</h2>
                     <p className="text-sm text-gray-500 mt-1">輸入關鍵字，讓 AI 為您尋找熱門商品！</p>
@@ -68,7 +106,6 @@ const AdminPage = () => {
                     </form>
                 </div>
 
-                {/* 商品管理區塊 */}
                 <div className="flex items-center justify-between">
                     <h1 className="text-3xl font-bold text-gray-800">商品管理</h1>
                     <button 
@@ -78,33 +115,35 @@ const AdminPage = () => {
                     </button>
                 </div>
 
-                {/* 商品列表 */}
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                             <tr>
-                                {/* [核心修正] 新增圖片預覽欄位 */}
                                 <th scope="col" className="px-6 py-3">圖片預覽</th>
                                 <th scope="col" className="px-6 py-3">商品名稱</th>
                                 <th scope="col" className="px-6 py-3">價格</th>
+                                {/* [核心修正] 新增欄位標題 */}
+                                <th scope="col" className="px-6 py-3">剩餘時間</th>
                                 <th scope="col" className="px-6 py-3">操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             {(products || []).map(product => (
                                 <tr key={product.id} className="bg-white border-b hover:bg-gray-50">
-                                    {/* [核心修正] 顯示商品圖片 */}
                                     <td className="px-6 py-4">
-                                        <img 
+                                        <SmartImage 
                                             src={product.image} 
                                             alt={product.name}
                                             className="w-16 h-16 object-cover rounded-md"
-                                            onError={handleImageError}
                                         />
                                     </td>
                                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{product.name}</td>
                                     <td className="px-6 py-4">{product.price}</td>
-                                    <td className="px-6 py-4 flex gap-4">
+                                    {/* [核心修正] 顯示倒數計時元件 */}
+                                    <td className="px-6 py-4">
+                                        <CountdownCell createdAt={product.createdAt} />
+                                    </td>
+                                    <td className="px-6 py-4 flex items-center gap-4">
                                         <button onClick={() => handleOpenEditModal(product)} className="font-medium text-indigo-600 hover:underline">編輯</button>
                                         <button onClick={() => handleConfirmDelete(product.id)} className="font-medium text-red-600 hover:underline">刪除</button>
                                     </td>
@@ -115,7 +154,6 @@ const AdminPage = () => {
                 </div>
             </div>
 
-            {/* 渲染彈出視窗 */}
             <ProductFormModal
                 isOpen={isFormModalOpen}
                 onClose={() => setIsFormModalOpen(false)}

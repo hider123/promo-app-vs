@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithCustomToken } from "firebase/auth";
-import { getFirestore, collection, onSnapshot, writeBatch, doc, addDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, writeBatch, doc, addDoc, deleteDoc, updateDoc, setDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 // --- 全域變數 ---
@@ -160,41 +160,49 @@ export const uploadBase64AsFile = (base64String, path, fileName) => {
  */
 export const setupListeners = (appId, userId, listeners, onInitialLoadComplete) => {
     if (!firestore) throw new Error("Firestore is not initialized.");
-    
     if (!Array.isArray(listeners)) {
-        if (typeof onInitialLoadComplete === 'function') {
-            onInitialLoadComplete();
-        }
+        if (typeof onInitialLoadComplete === 'function') { onInitialLoadComplete(); }
         return [];
     }
-
     let loadCount = 0;
     const totalListeners = listeners.length;
-
     const checkAllLoaded = () => {
         loadCount++;
-        if (loadCount === totalListeners) {
-            onInitialLoadComplete();
-        }
+        if (loadCount === totalListeners) { onInitialLoadComplete(); }
     };
 
-    return listeners.map(({ name, setter, initialData, isPublic }) => {
-        const path = isPublic
-            ? `artifacts/${appId}/public/data/${name}`
-            : `artifacts/${appId}/users/${userId}/${name}`;
-        const q = collection(firestore, path);
-        return onSnapshot(q, async (querySnapshot) => {
-            if (querySnapshot.empty && initialData && initialData.length > 0) {
-                const batch = writeBatch(firestore);
-                initialData.forEach(item => {
-                    const docRef = doc(collection(firestore, path));
-                    const { id, ...data } = item;
-                    batch.set(docRef, data);
-                });
-                await batch.commit();
-                setter(initialData.map(item => ({ ...item, id: crypto.randomUUID() })));
+    return listeners.map(({ name, setter, initialData, isPublic, isSingleDoc, docId }) => {
+        let query;
+        const path = isPublic ? `artifacts/${appId}/public/data/${name}` : `artifacts/${appId}/users/${userId}/${name}`;
+        
+        if (isSingleDoc) {
+            query = doc(firestore, path, docId);
+        } else {
+            query = collection(firestore, path);
+        }
+
+        return onSnapshot(query, async (snapshot) => {
+            if (isSingleDoc) {
+                if (!snapshot.exists() && initialData && initialData.length > 0) {
+                    const { id, ...dataToSet } = initialData[0];
+                    await setDoc(query, dataToSet);
+                    setter(dataToSet);
+                } else {
+                    setter(snapshot.data());
+                }
             } else {
-                setter(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                if (snapshot.empty && initialData && initialData.length > 0) {
+                    const batch = writeBatch(firestore);
+                    initialData.forEach(item => {
+                        const docRef = doc(collection(firestore, path));
+                        const { id, ...data } = item;
+                        batch.set(docRef, data);
+                    });
+                    await batch.commit();
+                    setter(initialData.map(item => ({ ...item, id: crypto.randomUUID() })));
+                } else {
+                    setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                }
             }
             if (loadCount < totalListeners) checkAllLoaded();
         }, (error) => {

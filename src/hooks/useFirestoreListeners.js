@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { setupListeners } from '../firebase/config';
-// [核心修正] 移除 initialProducts 的引入，因為我們不再需要它
 import {
     initialPoolAccountsData,
     initialTeamMembersData,
@@ -18,6 +17,7 @@ import {
  */
 export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onInitialLoadComplete) => {
     // 1. 為每個資料集合建立對應的 state
+    const [appSettings, setAppSettings] = useState(null);
     const [products, setProducts] = useState([]);
     const [poolAccounts, setPoolAccounts] = useState([]);
     const [teamMembers, setTeamMembers] = useState([]);
@@ -32,7 +32,7 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
 
         const allListeners = [
             // --- 公開資料 (Public Data) ---
-            // [核心修正] 移除了 'initialData: initialProducts'，關閉了商品的自動填補功能
+            { name: 'app_settings', setter: setAppSettings, initialData: [{ id: 'global', catPoolPrice: 5.00, commissionRate: 0.05, copyPushCommission: 1.50 }], isPublic: true, scope: ['user', 'admin'], isSingleDoc: true, docId: 'global' },
             { name: 'products', setter: setProducts, isPublic: true, scope: ['user', 'admin'] },
             { name: 'team_members', setter: setTeamMembers, initialData: initialTeamMembersData, isPublic: true, scope: ['user'] },
             { name: 'team_invitations', setter: setPendingInvitations, initialData: [], isPublic: true, scope: ['user'] },
@@ -54,6 +54,6 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
     }, [scope, isReadyToListen, userId, appId, onInitialLoadComplete]);
 
     // 3. 回傳所有資料狀態
-    return { products, poolAccounts, teamMembers, pendingInvitations, records };
+    return { appSettings, products, poolAccounts, teamMembers, pendingInvitations, records };
 };
 

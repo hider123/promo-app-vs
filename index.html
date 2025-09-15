@@ -1,13 +1,29 @@
 <!doctype html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Promo Dashboard</title>
+    <title>Promo App</title>
+
+    <!-- 1. 引入 Font Awesome 圖示庫 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" xintegrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- 2. 引入 Google Fonts 字體 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+
   </head>
   <body>
+    <!-- React 應用程式將會被掛載到這個 div 中 -->
     <div id="root"></div>
+
+    <!-- 載入 React 應用程式的主要 JavaScript 檔案 -->
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- 3. 引入前端圖片壓縮庫，必須放在 body 的結尾 -->
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
   </body>
 </html>
+
