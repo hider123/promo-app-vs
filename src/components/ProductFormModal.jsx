@@ -11,7 +11,7 @@ const ProductFormModal = ({ isOpen, onClose, product, onAdd, onUpdate }) => {
     });
     
     // 2. 圖片上傳相關狀態
-    const [isUploading, setIsUploading] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [imagePreview, setImagePreview] = useState('');
     const [statusText, setStatusText] = useState('');
@@ -28,7 +28,7 @@ const ProductFormModal = ({ isOpen, onClose, product, onAdd, onUpdate }) => {
                 setImagePreview('');
             }
             // 重設上傳狀態
-            setIsUploading(false);
+            setIsProcessing(false);
             setUploadProgress(0);
             setStatusText('');
         }
@@ -45,17 +45,16 @@ const ProductFormModal = ({ isOpen, onClose, product, onAdd, onUpdate }) => {
         const file = e.target.files[0];
         if (!file) return;
         
-        // 檢查壓縮工具是否已載入
         if (typeof window.imageCompression !== 'function') {
             alert('錯誤：圖片壓縮功能尚未載入，請確認 index.html 設定是否正確。');
             return;
         }
 
-        setIsUploading(true);
+        setIsProcessing(true);
         setStatusText('正在壓縮圖片...');
         setUploadProgress(0);
+        setImagePreview(URL.createObjectURL(file));
 
-        // 壓縮選項
         const options = {
             maxSizeMB: 1,
             maxWidthOrHeight: 1920,
@@ -63,41 +62,37 @@ const ProductFormModal = ({ isOpen, onClose, product, onAdd, onUpdate }) => {
         };
 
         try {
-            console.log(`原始圖片大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
-            
-            // 執行壓縮
             const compressedFile = await window.imageCompression(file, options);
             
-            console.log(`壓縮後圖片大小: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
-            
-            // 尺寸守門員：如果壓縮後還是太大，則拒絕上傳
             if (compressedFile.size / 1024 / 1024 > 1.5) {
                 throw new Error('壓縮後的圖片仍然太大，請選擇一張較小的圖片。');
             }
             
-            setImagePreview(URL.createObjectURL(compressedFile));
             setStatusText('正在上傳圖片...');
             
-            // 上傳壓縮後的檔案
             const downloadURL = await uploadFile(compressedFile, 'products/', (progress) => {
                 setUploadProgress(progress);
             });
             setFormData(prev => ({ ...prev, image: downloadURL }));
-            setStatusText('上傳完成！');
+            setStatusText('✅ 上傳完成！');
 
         } catch (error) {
             console.error('圖片壓縮或上傳失敗:', error);
             alert(`圖片處理失敗：${error.message}`);
-            setImagePreview(product ? product.image : ''); // 回復到舊的圖片預覽
+            setImagePreview(product ? product.image : '');
             setStatusText('處理失敗');
         } finally {
-            setIsUploading(false);
+            setIsProcessing(false);
         }
     };
 
     // 6. 處理表單提交
     const handleSubmit = (e) => {
         e.preventDefault();
+        if (!formData.image) {
+            alert('請先上傳一張商品圖片。');
+            return;
+        }
         const finalData = {
             ...formData,
             rating: product?.rating || '4.5',
@@ -145,12 +140,15 @@ const ProductFormModal = ({ isOpen, onClose, product, onAdd, onUpdate }) => {
                                         選擇檔案
                                     </label>
                                 </div>
-                                {isUploading && (
+                                {/* [核心修正] 改善進度條和提示的顯示邏輯 */}
+                                {(statusText) && (
                                     <div className="mt-2">
                                         <p className="text-sm text-gray-600">{statusText}</p>
-                                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                            <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
-                                        </div>
+                                        {(isProcessing && uploadProgress > 0) && (
+                                            <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
+                                                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%`, transition: 'width 0.2s' }}></div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -162,8 +160,8 @@ const ProductFormModal = ({ isOpen, onClose, product, onAdd, onUpdate }) => {
                     </div>
                     <div className="bg-gray-50 px-6 py-3 flex justify-end gap-3 rounded-b-lg">
                         <button type="button" onClick={onClose} className="py-2 px-4 rounded-md font-medium bg-gray-200 hover:bg-gray-300">取消</button>
-                        <button type="submit" disabled={isUploading} className="py-2 px-4 rounded-md font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-300">
-                            {isUploading ? '處理中...' : '儲存'}
+                        <button type="submit" disabled={isProcessing} className="py-2 px-4 rounded-md font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-300">
+                            {isProcessing ? '處理中...' : '儲存'}
                         </button>
                     </div>
                 </form>

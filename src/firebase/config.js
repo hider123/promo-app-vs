@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithCustomToken } from "firebase/auth";
-import { getFirestore, collection, onSnapshot, writeBatch, doc, addDoc, deleteDoc, updateDoc, setDoc } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, writeBatch, doc, addDoc, deleteDoc, updateDoc, setDoc, query, where } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 // --- 全域變數 ---
@@ -171,21 +171,22 @@ export const setupListeners = (appId, userId, listeners, onInitialLoadComplete) 
         if (loadCount === totalListeners) { onInitialLoadComplete(); }
     };
 
-    return listeners.map(({ name, setter, initialData, isPublic, isSingleDoc, docId }) => {
-        let query;
+    return listeners.map(({ name, setter, initialData, isPublic, isSingleDoc, docId, queryConstraints }) => {
+        let q;
         const path = isPublic ? `artifacts/${appId}/public/data/${name}` : `artifacts/${appId}/users/${userId}/${name}`;
         
         if (isSingleDoc) {
-            query = doc(firestore, path, docId);
+            q = doc(firestore, path, docId);
         } else {
-            query = collection(firestore, path);
+            const collectionRef = collection(firestore, path);
+            q = queryConstraints ? query(collectionRef, ...queryConstraints) : collectionRef;
         }
 
-        return onSnapshot(query, async (snapshot) => {
+        return onSnapshot(q, async (snapshot) => {
             if (isSingleDoc) {
                 if (!snapshot.exists() && initialData && initialData.length > 0) {
                     const { id, ...dataToSet } = initialData[0];
-                    await setDoc(query, dataToSet);
+                    await setDoc(q, dataToSet);
                     setter(dataToSet);
                 } else {
                     setter(snapshot.data());

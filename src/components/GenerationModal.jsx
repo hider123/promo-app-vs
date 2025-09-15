@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-// [核心修正] 引入新的 Context Hooks
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useUserContext } from '../context/UserContext.jsx';
 import { useAuthContext } from '../context/AuthContext.jsx';
 import { addData } from '../firebase/config';
@@ -20,6 +19,9 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
     const [pushSuccess, setPushSuccess] = useState(false);
     const [pushAccount, setPushAccount] = useState(null);
     const [pushProgress, setPushProgress] = useState(0);
+
+    // 使用 useRef 來建立一個「鎖」，防止無限迴圈
+    const hasAddedRecordRef = useRef(false);
     
     // 3. 計算衍生資料
     const pushedToday = useMemo(() => {
@@ -81,70 +83,66 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
         }
     }, [isOpen, modalView, startGenerationProcess]);
 
-    // [核心修正] 將推播模擬和新增紀錄的邏輯合併到一個穩定的 Effect 中
     useEffect(() => {
-        // 只有在 'pushing' 畫面且 pushAccount 已設定時，才執行此 Effect
-        if (modalView !== 'pushing' || !pushAccount) return;
+        if (modalView !== 'pushing' || !pushAccount || hasAddedRecordRef.current) return;
+        
+        hasAddedRecordRef.current = true;
         
         let isCancelled = false;
         let progress = 0;
         setPushSuccess(false);
         setPushProgress(0);
 
-        const simulatePush = async () => {
-            // 模擬進度條
-            const interval = setInterval(() => {
-                if (isCancelled) {
-                    clearInterval(interval);
-                    return;
+        // [核心修正] 建立一個獨立的 async 函式來處理資料庫寫入
+        const addRecordToDb = async () => {
+            const commissionValue = appSettings?.copyPushCommission || 1.50;
+            const newRecord = {
+                type: 'commission',
+                description: `佣金: ${product.name}`,
+                date: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16).replace('T', ' '),
+                amount: commissionValue,
+                status: '成功',
+                platformDetails: {
+                    product: product.name,
+                    account: pushAccount.name,
+                    platform: pushAccount.platform,
+                    targetPlatform: activePlatform
                 }
+            };
+            
+            try {
+                // 等待資料庫操作完成
+                await addData(`artifacts/${appId}/users/${userId}/records`, newRecord);
+                if (!isCancelled) {
+                    setPushSuccess(true);
+                    setTimeout(() => {
+                        if (!isCancelled) onPushSuccess();
+                    }, 1500);
+                }
+            } catch (error) {
+                console.error("新增紀錄失敗: ", error);
+                // 可以在這裡加入一個錯誤提示
+            }
+        };
+
+        const simulatePush = () => {
+            const interval = setInterval(() => {
+                if (isCancelled) { clearInterval(interval); return; }
                 progress += 20;
                 setPushProgress(progress);
+
                 if (progress >= 100) {
                     clearInterval(interval);
                     if (isCancelled) return;
-
-                    // 進度條完成後，新增紀錄
-                    const commissionValue = appSettings?.copyPushCommission || 1.50;
-                    const newRecord = {
-                        type: 'commission',
-                        description: `佣金: ${product.name}`,
-                        date: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16).replace('T', ' '),
-                        amount: commissionValue,
-                        status: '成功',
-                        platformDetails: {
-                            product: product.name,
-                            account: pushAccount.name,
-                            platform: pushAccount.platform,
-                            targetPlatform: activePlatform
-                        }
-                    };
-                    
-                    try {
-                        // 這個 await 確保了紀錄被新增
-                        addData(`artifacts/${appId}/users/${userId}/records`, newRecord);
-                        if (!isCancelled) {
-                            setPushSuccess(true);
-                            // 延遲一段時間後才跳轉，讓使用者能看到成功訊息
-                            setTimeout(() => {
-                                if (!isCancelled) onPushSuccess();
-                            }, 1500);
-                        }
-                    } catch (error) {
-                        console.error("新增紀錄失敗: ", error);
-                    }
+                    // 當進度條完成後，呼叫這個獨立的 async 函式
+                    addRecordToDb();
                 }
             }, 300);
         };
 
         simulatePush();
         
-        // 清理函式：當元件卸載或依賴項改變時，確保非同步操作被取消
-        return () => {
-            isCancelled = true;
-        };
-
-    // [核心修正] 依賴項只包含 modalView 和 pushAccount，確保這個 Effect 只會在確認推播時執行一次
+        return () => { isCancelled = true; };
     }, [modalView, pushAccount]);
 
 
@@ -158,6 +156,7 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
                 setIsLoading(true);
                 setPushAccount(null);
                 setPushProgress(0);
+                hasAddedRecordRef.current = false;
             }, 300);
             return () => clearTimeout(timer);
         }
@@ -168,7 +167,6 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
         setGeneratedText(generateAIContent(product, platform));
     };
     
-    // 6. 根據 modalView 渲染不同的內部畫面
     const renderContent = () => {
         if (modalView === 'pushing') {
             return (
@@ -177,7 +175,9 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
                         <>
                             <i className="fas fa-check-circle fa-3x text-green-500"></i>
                             <h4 className="text-xl font-semibold mt-4">推播成功！</h4>
-                            <p className="text-gray-600 mt-2">文案已成功發布至：</p>
+                            <p className="text-gray-600 mt-2">
+                                文案已成功發布至 <span className="font-semibold text-indigo-600">{activePlatform}</span> 平台，使用帳號：
+                            </p>
                             <div className="mt-4 inline-flex items-center bg-gray-100 rounded-lg p-2">
                                 {pushAccount && <img src={pushAccount.avatar} className="w-8 h-8 rounded-full" alt={pushAccount.name}/>}
                                 <span className="ml-3 font-semibold text-gray-800">{pushAccount ? pushAccount.name : ''}</span>
@@ -187,12 +187,13 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
                         <>
                             <i className="fas fa-spinner fa-spin fa-3x text-indigo-600"></i>
                             <h4 className="text-xl font-semibold mt-4">推播進行中...</h4>
-                            {pushAccount && (
-                                <div className="mt-4 inline-flex items-center bg-gray-100 rounded-lg p-2">
-                                    <img src={pushAccount.avatar} className="w-8 h-8 rounded-full" alt={pushAccount.name}/>
-                                    <span className="ml-3 font-semibold text-gray-800">{pushAccount.name}</span>
-                                </div>
-                            )}
+                            <p className="text-gray-600 mt-2">
+                                正在將文案發布至 <span className="font-semibold text-indigo-600">{activePlatform}</span> 平台，使用帳號：
+                            </p>
+                            <div className="mt-4 inline-flex items-center bg-gray-100 rounded-lg p-2">
+                                {pushAccount && <img src={pushAccount.avatar} className="w-8 h-8 rounded-full" alt={pushAccount.name}/>}
+                                <span className="ml-3 font-semibold text-gray-800">{pushAccount ? pushAccount.name : ''}</span>
+                            </div>
                             <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
                                 <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${pushProgress}%`, transition: 'width 0.3s' }}></div>
                             </div>
