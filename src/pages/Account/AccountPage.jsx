@@ -1,60 +1,74 @@
-import React, { useState } from 'react';
-// [修正] 引入新的 Context Hooks
+import React, { useState, useMemo, useEffect } from 'react';
 import { useUserContext } from '../../context/UserContext.jsx';
 import { useAuthContext } from '../../context/AuthContext.jsx';
 import RechargeModal from '../../components/RechargeModal.jsx';
 
 const AccountPage = ({ onNavigate, setRechargeAmount }) => {
-    // 1. 從各自的 Context 取得資料
+    // 1. 從 Context 取得所需的資料和函式
     const { handleSignOut, userId } = useAuthContext();
-    const { records, showAlert } = useUserContext();
+    const { records, showAlert, appSettings } = useUserContext();
     
     // 2. 管理此頁面自身的 UI 狀態
     const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
+    // [核心修正] 新增 state 來管理社群帳號的連結狀態
+    const [linkedAccounts, setLinkedAccounts] = useState({
+        facebook: true,
+        twitter: true,
+        instagram: false,
+        tiktok: false, // 新增 TikTok 的初始狀態
+    });
 
-    // 3. 計算衍生資料
+    // 3. 計算衍生資料 (Derived Data)
     const totalBalance = (records || []).reduce((sum, r) => sum + (r.amount || 0), 0);
-    const totalCommissionEarned = (records || []).filter(r => r.type === 'commission' && r.amount > 0).reduce((sum, r) => sum + r.amount, 0);
+    const catPoolPurchaseCount = useMemo(() => 
+        (records || []).filter(r => r.type === 'expense' && r.description.startsWith('費用: 購買貓池帳號')).length,
+    [records]);
     const pendingCommission = 5.00;
     const withdrawableBalance = totalBalance > pendingCommission ? totalBalance - pendingCommission : 0;
 
-    // 4. 定義輔助函式
-    const getUserLevel = (commission) => {
-        if (commission >= 1500) return { name: '首席顧問', color: 'bg-indigo-100 text-indigo-800' };
-        if (commission >= 300) return { name: '資深總監', color: 'bg-purple-100 text-purple-800' };
-        if (commission >= 60) return { name: '推廣經理', color: 'bg-sky-100 text-sky-800' };
-        return { name: '行銷專員', color: 'bg-teal-100 text-teal-800' };
-    };
-    const userLevel = getUserLevel(totalCommissionEarned);
+    // 4. 定義輔助函式 (Helper Functions)
+    const getUserLevel = (purchaseCount) => {
+        const highTier = appSettings?.highTierThreshold ?? 100;
+        const midTier = appSettings?.midTierThreshold ?? 20;
 
-    const formatUserId = (id) => {
-        if (!id) return '0000-0000';
-        const simpleHash = (str) => {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                const char = str.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash |= 0;
-            }
-            return Math.abs(hash);
-        };
-        const numericId = simpleHash(id).toString().padStart(8, '0');
-        return `${numericId.slice(0, 4)}-${numericId.slice(4, 8)}`;
+        if (purchaseCount >= highTier) return { name: '品牌大使(高階)', color: 'bg-indigo-100 text-indigo-800' };
+        if (purchaseCount >= midTier) return { name: '行銷達人(中階)', color: 'bg-purple-100 text-purple-800' };
+        return { name: '推廣新星(初階)', color: 'bg-sky-100 text-sky-800' };
     };
-    const formattedUserId = formatUserId(userId);
+    const userLevel = getUserLevel(catPoolPurchaseCount);
     
-    // 5. 定義事件處理函式
+    // 5. 定義事件處理函式 (Event Handlers)
     const handleConfirmRecharge = (amount) => {
         setIsRechargeModalOpen(false);
         setRechargeAmount(amount);
         onNavigate('paymentChannels');
     };
+    
+    // [核心修正] 新增一個函式來處理連結/取消連結的邏輯
+    const handleToggleLink = (platform, platformName) => {
+        const isCurrentlyLinked = linkedAccounts[platform];
+        // 在這裡可以加入呼叫後端 API 的邏輯
+        console.log(`正在 ${isCurrentlyLinked ? '取消連結' : '連結'} ${platformName}...`);
+        
+        // 更新前端的 UI 狀態
+        setLinkedAccounts(prev => ({
+            ...prev,
+            [platform]: !isCurrentlyLinked
+        }));
 
-    const handleLinkAccount = (platform) => {
-        showAlert(`🎉 ${platform} 帳號連結成功！`);
+        // 顯示成功提示
+        showAlert(`🎉 ${platformName} 帳號${isCurrentlyLinked ? '已取消連結' : '連結成功'}！`);
     };
 
-    // 6. 回傳 JSX
+    const socialPlatforms = [
+        { key: 'facebook', name: 'Facebook', icon: 'fab fa-facebook text-3xl text-blue-600 mr-5 w-8 text-center' },
+        { key: 'twitter', name: 'X (Twitter)', icon: 'fab fa-twitter text-3xl text-gray-800 mr-5 w-8 text-center' },
+        { key: 'instagram', name: 'Instagram', icon: 'fab fa-instagram text-3xl text-pink-500 mr-5 w-8 text-center' },
+        // [核心修正] 新增 TikTok 到平台列表
+        { key: 'tiktok', name: 'TikTok', icon: 'fab fa-tiktok text-3xl text-black mr-5 w-8 text-center' }
+    ];
+
+    // 6. 回傳 JSX 結構來渲染 UI
     return (
         <>
             <div className="space-y-8 p-4">
@@ -69,7 +83,6 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                                 <p className="font-bold text-2xl text-gray-900">PromoMaster</p>
                                 <span className={`${userLevel.color} text-sm font-semibold px-3 py-1 rounded-full`}>{userLevel.name}</span>
                             </div>
-                            <p className="text-lg text-gray-600 truncate">UserID: {userId ? formattedUserId : '登入中...'}</p>
                         </div>
                     </div>
                     <button onClick={() => onNavigate('editProfile')} className="absolute top-5 right-5 text-lg font-bold text-indigo-600 hover:text-indigo-800 flex-shrink-0">編輯</button>
@@ -89,41 +102,35 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                         <div className="px-5">待處理: <span className="font-bold">US$ {pendingCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                     </div>
                     <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8">
-                        <button className="w-full max-w-xs py-3 rounded-lg font-bold transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300 text-xl">
-                            申請提領
-                        </button>
-                        <button 
-                            onClick={() => setIsRechargeModalOpen(true)}
-                            className="w-full max-w-xs py-3 rounded-lg font-bold transition-colors bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 text-xl">
-                            儲值
-                        </button>
+                        <button className="w-full max-w-xs py-3 rounded-lg font-bold transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300 text-xl">申請提領</button>
+                        <button onClick={() => setIsRechargeModalOpen(true)} className="w-full max-w-xs py-3 rounded-lg font-bold transition-colors bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 text-xl">儲值</button>
                     </div>
                 </div>
-
+                
                 <div className="bg-white p-5 rounded-xl shadow-sm">
                     <h2 className="text-2xl font-bold text-gray-800 mb-4">已連結的社群帳號</h2>
                      <ul className="divide-y divide-gray-200">
-                        <li className="flex items-center justify-between py-4">
-                            <div className="flex items-center">
-                                <i className="fab fa-facebook text-3xl text-blue-600 mr-5 w-8 text-center"></i>
-                                <span className="font-bold text-gray-800 text-lg">Facebook</span>
-                            </div>
-                            <button className="text-lg font-bold text-red-600 hover:text-red-800">取消連結</button>
-                        </li>
-                        <li className="flex items-center justify-between py-4">
-                            <div className="flex items-center">
-                                <i className="fab fa-twitter text-3xl text-gray-800 mr-5 w-8 text-center"></i>
-                                <span className="font-bold text-gray-800 text-lg">X (Twitter)</span>
-                            </div>
-                             <button className="text-lg font-bold text-red-600 hover:text-red-800">取消連結</button>
-                        </li>
-                         <li className="flex items-center justify-between py-4">
-                            <div className="flex items-center">
-                               <i className="fab fa-instagram text-3xl text-pink-500 mr-5 w-8 text-center"></i>
-                               <span className="font-bold text-gray-800 text-lg">Instagram</span>
-                            </div>
-                            <button onClick={() => handleLinkAccount('Instagram')} className="text-lg font-bold text-indigo-600 hover:text-indigo-800">連結帳號</button>
-                        </li>
+                        {socialPlatforms.map(platform => (
+                            <li key={platform.key} className="flex items-center justify-between py-4">
+                                <div className="flex items-center">
+                                    <i className={platform.icon}></i>
+                                    <span className="font-bold text-gray-800 text-lg">{platform.name}</span>
+                                </div>
+                                {linkedAccounts[platform.key] ? (
+                                    <button 
+                                        onClick={() => handleToggleLink(platform.key, platform.name)}
+                                        className="text-lg font-bold text-red-600 hover:text-red-800">
+                                        取消連結
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={() => handleToggleLink(platform.key, platform.name)}
+                                        className="text-lg font-bold text-indigo-600 hover:text-indigo-800">
+                                        連結帳號
+                                    </button>
+                                )}
+                            </li>
+                        ))}
                     </ul>
                 </div>
 

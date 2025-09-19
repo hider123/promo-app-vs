@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithCustomToken } from "firebase/auth";
-import { getFirestore, collection, onSnapshot, writeBatch, doc, addDoc, deleteDoc, updateDoc, setDoc, query, where } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, writeBatch, doc, addDoc, deleteDoc, updateDoc, setDoc, query, where, collectionGroup } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 // --- 全域變數 ---
@@ -85,72 +85,6 @@ export const initializeFirebase = async () => {
 };
 
 /**
- * 上傳檔案到 Firebase Storage 的通用函式。
- * @param {File} file - 要上傳的檔案。
- * @param {string} path - 儲存的路徑 (例如: 'products/')。
- * @param {Function} onProgress - 上傳進度的回呼函式。
- * @returns {Promise<string>} - 檔案的公開下載 URL。
- */
-export const uploadFile = (file, path, onProgress) => {
-    return new Promise((resolve, reject) => {
-        if (!storage || !authInstance.currentUser) {
-            return reject(new Error("權限不足：必須登入才能上傳檔案。"));
-        }
-        const storageRef = ref(storage, `${path}${Date.now()}_${file.name}`);
-        const uploadTask = uploadBytesResumable(storageRef, file);
-
-        uploadTask.on('state_changed',
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                onProgress(progress);
-            },
-            (error) => {
-                console.error("檔案上傳失敗:", error);
-                reject(error);
-            },
-            () => {
-                getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                    resolve(downloadURL);
-                });
-            }
-        );
-    });
-};
-
-/**
- * 上傳 Base64 圖片資料到 Firebase Storage 的函式。
- * @param {string} base64String - Base64 格式的圖片資料。
- * @param {string} path - 儲存的路徑。
- * @param {string} fileName - 檔案名稱。
- * @returns {Promise<string>} - 檔案的公開下載 URL。
- */
-export const uploadBase64AsFile = (base64String, path, fileName) => {
-    return new Promise(async (resolve, reject) => {
-        if (!storage || !authInstance.currentUser) {
-            return reject(new Error("服務未就緒或未登入。"));
-        }
-        try {
-            const response = await fetch(base64String);
-            const blob = await response.blob();
-            const file = new File([blob], `${fileName.replace(/\s+/g, '_') || 'image'}.png`, { type: 'image/png' });
-            
-            const storageRef = ref(storage, `${path}${Date.now()}_${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            uploadTask.on('state_changed',
-                () => {}, // 我們在這裡不需要進度回報
-                (error) => reject(error),
-                () => {
-                    getDownloadURL(uploadTask.snapshot.ref).then(resolve);
-                }
-            );
-        } catch (error) {
-            reject(error);
-        }
-    });
-};
-
-/**
  * 設定多個 Firestore 集合的即時監聽器。
  * @param {string} appId - 應用程式 ID。
  * @param {string} userId - 使用者 ID。
@@ -171,20 +105,23 @@ export const setupListeners = (appId, userId, listeners, onInitialLoadComplete) 
         if (loadCount === totalListeners) { onInitialLoadComplete(); }
     };
 
-    return listeners.map(({ name, setter, initialData, isPublic, isSingleDoc, docId, queryConstraints }) => {
+    return listeners.map(({ name, setter, initialData, isPublic, isSingleDoc, docId, queryConstraints, isCollectionGroup, seedOnEmpty }) => {
         let q;
         const path = isPublic ? `artifacts/${appId}/public/data/${name}` : `artifacts/${appId}/users/${userId}/${name}`;
         
         if (isSingleDoc) {
             q = doc(firestore, path, docId);
+        } else if (isCollectionGroup) {
+            const groupRef = collectionGroup(firestore, name);
+            q = queryConstraints && queryConstraints.length > 0 ? query(groupRef, ...queryConstraints) : groupRef;
         } else {
             const collectionRef = collection(firestore, path);
-            q = queryConstraints ? query(collectionRef, ...queryConstraints) : collectionRef;
+            q = queryConstraints && queryConstraints.length > 0 ? query(collectionRef, ...queryConstraints) : collectionRef;
         }
 
         return onSnapshot(q, async (snapshot) => {
             if (isSingleDoc) {
-                if (!snapshot.exists() && initialData && initialData.length > 0) {
+                if (!snapshot.exists() && seedOnEmpty && initialData && initialData.length > 0) {
                     const { id, ...dataToSet } = initialData[0];
                     await setDoc(q, dataToSet);
                     setter(dataToSet);
@@ -192,7 +129,7 @@ export const setupListeners = (appId, userId, listeners, onInitialLoadComplete) 
                     setter(snapshot.data());
                 }
             } else {
-                if (snapshot.empty && initialData && initialData.length > 0) {
+                if (snapshot.empty && seedOnEmpty && initialData && initialData.length > 0) {
                     const batch = writeBatch(firestore);
                     initialData.forEach(item => {
                         const docRef = doc(collection(firestore, path));
@@ -210,6 +147,54 @@ export const setupListeners = (appId, userId, listeners, onInitialLoadComplete) 
             console.error(`Error fetching ${name}:`, error);
             if (loadCount < totalListeners) checkAllLoaded();
         });
+    });
+};
+
+/**
+ * 上傳檔案到 Firebase Storage 的通用函式。
+ */
+export const uploadFile = (file, path, onProgress) => {
+    return new Promise((resolve, reject) => {
+        if (!storage || !authInstance.currentUser) {
+            return reject(new Error("權限不足：必須登入才能上傳檔案。"));
+        }
+        const storageRef = ref(storage, `${path}${Date.now()}_${file.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+
+        uploadTask.on('state_changed',
+            (snapshot) => onProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+            (error) => reject(error),
+            () => getDownloadURL(uploadTask.snapshot.ref).then(resolve)
+        );
+    });
+};
+
+/**
+ * 上傳 Base64 圖片資料到 Firebase Storage 的函式。
+ */
+export const uploadBase64AsFile = (base64String, path, fileName) => {
+    return new Promise(async (resolve, reject) => {
+        if (!storage || !authInstance.currentUser) {
+            return reject(new Error("服務未就緒或未登入。"));
+        }
+        try {
+            const response = await fetch(base64String);
+            const blob = await response.blob();
+            const file = new File([blob], `${fileName.replace(/\s+/g, '_') || 'image'}.png`, { type: 'image/png' });
+            
+            const storageRef = ref(storage, `${path}${Date.now()}_${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed',
+                () => {},
+                (error) => reject(error),
+                () => {
+                    getDownloadURL(uploadTask.snapshot.ref).then(resolve);
+                }
+            );
+        } catch (error) {
+            reject(error);
+        }
     });
 };
 

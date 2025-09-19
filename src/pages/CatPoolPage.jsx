@@ -1,11 +1,15 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useUserContext } from '../context/UserContext.jsx';
 
 const CatPoolPage = ({ onAddAccountClick }) => {
     // 1. 從 UserContext 取得所需的資料和函式
     const { poolAccounts, records, showAlert } = useUserContext();
+    
+    // 2. 管理此頁面自身的 UI 狀態 (目前的頁碼)
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
 
-    // 2. 計算衍生資料 (Derived Data)
+    // 3. 計算衍生資料 (Derived Data)
     const pushedToday = useMemo(() => {
         if (!records) return new Set();
         const todayStr = new Date().toLocaleDateString('sv-SE');
@@ -18,15 +22,23 @@ const CatPoolPage = ({ onAddAccountClick }) => {
     const pushedTodayCount = pushedToday.size;
     const notPushedTodayCount = totalAccounts - pushedTodayCount;
 
-    const sortedAccounts = useMemo(() => 
-        [...(poolAccounts || [])].sort((a, b) => {
+    const { paginatedAccounts, pageCount } = useMemo(() => {
+        const sorted = [...(poolAccounts || [])].sort((a, b) => {
             const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : 0;
             const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : 0;
             return new Date(dateB) - new Date(dateA);
-        }), 
-    [poolAccounts]);
+        });
 
-    // 3. 定義事件處理函式
+        const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE);
+        const paginated = sorted.slice(
+            (currentPage - 1) * ITEMS_PER_PAGE,
+            currentPage * ITEMS_PER_PAGE
+        );
+        
+        return { paginatedAccounts: paginated, pageCount: totalPages };
+    }, [poolAccounts, currentPage]);
+
+    // 4. 定義事件處理函式
     const onDetailsClick = useCallback((account) => {
         const date = account.createdAt?.toDate ? account.createdAt.toDate() : account.createdAt;
         const formattedDate = date ? new Date(date).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '不明';
@@ -40,7 +52,7 @@ const CatPoolPage = ({ onAddAccountClick }) => {
         showAlert(message);
     }, [records, showAlert]);
 
-    // 4. 定義輔助函式
+    // 5. 定義輔助函式
     const formatCreationDate = (createdAt) => {
         if (!createdAt) return { month: '??', day: '??' };
         let dateObj;
@@ -54,14 +66,14 @@ const CatPoolPage = ({ onAddAccountClick }) => {
         return { month, day };
     };
 
-    // 5. 回傳 JSX 結構
+    // 6. 回傳 JSX 結構
     return (
         <div className="relative h-full">
-            <div className="space-y-4 p-4">
+            {/* [核心修正] 在主要內容容器加入 pb-[var(--tab-bar-height)]，為底部導覽列預留空間 */}
+            <div className="space-y-4 p-4 pb-[calc(var(--tab-bar-height)_+_1rem)]">
                 <h1 className="text-3xl font-bold text-gray-800">貓池</h1>
                 <p className="text-gray-600">管理您不同帳號的內容池，快速選用素材與文案。</p>
 
-                {/* [核心修正] 將三個統計數據合併到一個橫列中 */}
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                     <div className="grid grid-cols-3 divide-x divide-gray-200 text-center">
                         <div>
@@ -81,7 +93,7 @@ const CatPoolPage = ({ onAddAccountClick }) => {
 
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                     <ul className="divide-y divide-gray-200">
-                        {sortedAccounts.map(account => {
+                        {paginatedAccounts.map(account => {
                             const hasPushedToday = pushedToday.has(account.name);
                             const { month, day } = formatCreationDate(account.createdAt);
                             return (
@@ -113,6 +125,27 @@ const CatPoolPage = ({ onAddAccountClick }) => {
                             )
                         })}
                     </ul>
+                    {pageCount > 1 && (
+                        <div className="flex justify-center items-center gap-4 p-4 border-t">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="py-1 px-3 rounded-md font-semibold text-sm bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                上一頁
+                            </button>
+                            <span className="text-sm font-medium text-gray-600">
+                                第 {currentPage} / {pageCount} 頁
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(p + 1, pageCount))}
+                                disabled={currentPage === pageCount}
+                                className="py-1 px-3 rounded-md font-semibold text-sm bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                下一頁
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
             <button 

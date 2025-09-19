@@ -14,26 +14,13 @@ export const AdminProvider = ({ children }) => {
     // a. 從 AuthContext 取得 AppID 和使用者資訊
     const { appId, user } = useAuthContext();
     
-    // b. 只監聽「商品」等公開資料集合
-    const { products, appSettings } = useFirestoreListeners(
-        'admin',   // scope
-        appId,
-        user?.uid, // 傳入 uid 以觸發 effect 更新
-        !!user,    // 確保使用者物件存在時才開始監聽
-        useCallback(() => {}, [])
-    );
-
-    // c. 管理後台介面的 UI 狀態 (例如：彈出提示)
+    // b. 呼叫「資料雷達」，並明確告知 scope 是 'admin'
+    const { products, appSettings, allUserRecords } = useFirestoreListeners('admin', appId, user?.uid, !!user, useCallback(() => {}, []));
     const [alert, setAlert] = useState({ isOpen: false, message: '' });
-    
-    // d. 封裝所有「管理員專屬」的業務邏輯
-    const showAlert = useCallback((message) => {
-        setAlert({ isOpen: true, message });
-    }, []);
 
-    const closeAlert = useCallback(() => {
-        setAlert({ isOpen: false, message: '' });
-    }, []);
+    // c. 封裝所有「管理員專屬」的業務邏輯
+    const showAlert = useCallback((message) => setAlert({ isOpen: true, message }), []);
+    const closeAlert = useCallback(() => setAlert({ isOpen: false, message: '' }), []);
 
     const handleUpdateSettings = async (newSettings) => {
         if (!appId) return;
@@ -48,18 +35,15 @@ export const AdminProvider = ({ children }) => {
 
     const handleAddProduct = async (productData) => {
         if (!appId) return;
-
         try {
             let finalImageUrl = productData.image_url || productData.image;
-
             if (finalImageUrl && finalImageUrl.startsWith('data:image/png;base64,')) {
                 showAlert('正在將 AI 生成的圖片上傳至雲端...');
                 finalImageUrl = await uploadBase64AsFile(finalImageUrl, 'products/', productData.name);
             }
-
-            const priceString = typeof productData.price === 'number'
-                ? `US$${productData.price.toFixed(2)}`
-                : productData.price;
+            const priceString = typeof productData.price === 'number' ? `US$${productData.price.toFixed(2)}` : productData.price;
+            
+            const defaultDeadline = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
 
             const newProduct = {
                 name: productData.name || '未命名商品',
@@ -69,12 +53,16 @@ export const AdminProvider = ({ children }) => {
                 rating: '4.5',
                 image: finalImageUrl || `https://placehold.co/600x400/e2e8f0/475569?text=${encodeURIComponent(productData.name || '商品')}`,
                 createdAt: new Date().toISOString(),
+                deadline: productData.deadline || defaultDeadline,
+                status: 'draft',
+                pushLimit: productData.pushLimit || 100,
+                popularity: productData.popularity || 5,
+                commissionMin: productData.commissionMin || 0.2,
+                commissionMax: productData.commissionMax || 0.5,
                 tag: { text: '新品', color: 'bg-blue-500' }
             };
-            
             await addData(`artifacts/${appId}/public/data/products`, newProduct);
             showAlert('🎉 商品新增成功！');
-
         } catch (error) {
             console.error("新增商品失敗:", error);
             showAlert(`新增商品失敗：${error.message}`);
@@ -103,10 +91,23 @@ export const AdminProvider = ({ children }) => {
         }
     };
 
-    // e. 組合所有要提供給後台子元件的 value
+    const handleTogglePublishStatus = async (productId, currentStatus) => {
+        if (!appId) return;
+        const newStatus = currentStatus === 'published' ? 'draft' : 'published';
+        try {
+            await updateData(`artifacts/${appId}/public/data/products`, productId, { status: newStatus });
+            showAlert(`商品狀態已更新為：${newStatus === 'published' ? '已發佈' : '草稿'}`);
+        } catch (error) {
+            console.error("更新商品狀態失敗:", error);
+            showAlert("狀態更新失敗，請稍後再試。");
+        }
+    };
+
+    // d. 組合所有要提供給後台子元件的 value
     const value = {
         products,
         appSettings,
+        allUserRecords,
         alert,
         showAlert,
         closeAlert,
@@ -114,9 +115,10 @@ export const AdminProvider = ({ children }) => {
         handleUpdateProduct,
         handleDeleteProduct,
         handleUpdateSettings,
+        handleTogglePublishStatus,
     };
 
-    // f. 透過 Provider 將 value 廣播出去
+    // e. 透過 Provider 將 value 廣播出去
     return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
 };
 

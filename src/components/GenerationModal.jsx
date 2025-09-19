@@ -20,7 +20,6 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
     const [pushAccount, setPushAccount] = useState(null);
     const [pushProgress, setPushProgress] = useState(0);
 
-    // 使用 useRef 來建立一個「鎖」，防止無限迴圈
     const hasAddedRecordRef = useRef(false);
     
     // 3. 計算衍生資料
@@ -93,9 +92,21 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
         setPushSuccess(false);
         setPushProgress(0);
 
-        // [核心修正] 建立一個獨立的 async 函式來處理資料庫寫入
         const addRecordToDb = async () => {
-            const commissionValue = appSettings?.copyPushCommission || 1.50;
+            // [核心修正] 更新佣金計算邏輯
+            const min = product.commissionMin;
+            const max = product.commissionMax;
+            
+            let commissionValue;
+            // 檢查商品是否有獨立的佣金範圍設定
+            if (typeof min === 'number' && typeof max === 'number' && min <= max) {
+                // 如果有，則在此範圍內產生一個隨機佣金
+                commissionValue = Math.random() * (max - min) + min;
+            } else {
+                // 否則，使用全域設定的固定佣金
+                commissionValue = appSettings?.copyPushCommission || 1.50;
+            }
+
             const newRecord = {
                 type: 'commission',
                 description: `佣金: ${product.name}`,
@@ -111,7 +122,6 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
             };
             
             try {
-                // 等待資料庫操作完成
                 await addData(`artifacts/${appId}/users/${userId}/records`, newRecord);
                 if (!isCancelled) {
                     setPushSuccess(true);
@@ -121,7 +131,6 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
                 }
             } catch (error) {
                 console.error("新增紀錄失敗: ", error);
-                // 可以在這裡加入一個錯誤提示
             }
         };
 
@@ -134,7 +143,6 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
                 if (progress >= 100) {
                     clearInterval(interval);
                     if (isCancelled) return;
-                    // 當進度條完成後，呼叫這個獨立的 async 函式
                     addRecordToDb();
                 }
             }, 300);
@@ -167,6 +175,7 @@ const GenerationModal = ({ product, isOpen, onClose, onPushSuccess }) => {
         setGeneratedText(generateAIContent(product, platform));
     };
     
+    // 6. 根據 modalView 渲染不同的內部畫面
     const renderContent = () => {
         if (modalView === 'pushing') {
             return (

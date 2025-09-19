@@ -1,10 +1,72 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuthContext } from '../../context/AuthContext.jsx';
+import { useUserContext } from '../../context/UserContext.jsx';
 
-// 編輯個人資料頁面
 const EditProfilePage = ({ onBack }) => {
+    // 1. 從 Context 取得使用者資訊和功能
+    const { userId, user, showAlert } = useAuthContext();
+    const { updateUserProfile } = useUserContext();
+    
+    // 2. 使用 state 統一管理所有表單欄位
+    const [formData, setFormData] = useState({
+        username: 'PromoMaster',
+        email: '',
+        phone: '',
+        referrerId: ''
+    });
+    const [copySuccess, setCopySuccess] = useState('');
+
+    // 當 user 物件載入後，更新表單的預設 email (如果有的話)
+    useEffect(() => {
+        if (user?.email) {
+            setFormData(prev => ({ ...prev, email: user.email }));
+        }
+    }, [user]);
+
+    // 帳戶 ID 直接使用 Firebase 的 UID，確保唯一性
+    const accountId = userId;
+
+    // 4. 定義事件處理函式
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({...prev, [name]: value}));
+    };
+    
+    const handleCopy = () => {
+        if (!accountId) return;
+        const textArea = document.createElement("textarea");
+        textArea.value = accountId;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            setCopySuccess('已複製！');
+            setTimeout(() => setCopySuccess(''), 2000);
+        } catch (err) {
+            setCopySuccess('複製失敗');
+        }
+        document.body.removeChild(textArea);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        // [核心檢查機制] 在這裡檢查推薦人 ID 是否與帳戶 ID 相同
+        if (formData.referrerId && formData.referrerId === accountId) {
+            showAlert('您不能將自己設為推薦人。');
+            return; // 如果相同，則中斷儲存流程
+        }
+
+        // 呼叫 Context 中的函式來儲存資料
+        await updateUserProfile(formData);
+    };
+
+    // 統一所有輸入框的樣式
+    const inputStyle = "mt-2 block w-full border border-gray-300 rounded-lg shadow-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-lg p-3 bg-gray-100 focus:bg-white transition-colors";
+
+    // 5. 回傳 JSX 結構
     return (
         <div className="p-4">
-            {/* 頁面標頭 */}
             <div className="relative flex items-center justify-center mb-8">
                 <button 
                     onClick={onBack} 
@@ -16,54 +78,62 @@ const EditProfilePage = ({ onBack }) => {
                 <h1 className="text-5xl font-bold text-gray-900">編輯個人資料</h1>
             </div>
 
-            <div className="space-y-8">
-                {/* 頭像編輯區塊 */}
-                <div className="flex flex-col items-center pt-4">
-                    <div className="relative">
-                        <img className="h-28 w-28 rounded-full object-cover border-4 border-white shadow-md" src="https://placehold.co/100x100/e2e8f0/475569?text=頭像" alt="使用者頭像" />
-                        <button className="absolute -bottom-1 -right-1 bg-indigo-600 h-10 w-10 rounded-full text-white flex items-center justify-center border-4 border-white shadow-sm">
-                            <i className="fas fa-camera text-lg"></i>
-                        </button>
-                    </div>
-                </div>
-
-                {/* 表單區塊 */}
+            <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="bg-white p-5 rounded-xl shadow-sm space-y-6">
-                        <div>
-                            <label htmlFor="username" className="block text-xl font-bold text-gray-700">使用者名稱</label>
-                            <input type="text" id="username" defaultValue="PromoMaster" className="mt-2 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-lg p-3"/>
-                        </div>
-                        <div>
-                            <label htmlFor="email" className="block text-xl font-bold text-gray-700">電子郵件</label>
-                            <input type="email" id="email" defaultValue="promomaster@example.com" className="mt-2 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-lg p-3"/>
-                        </div>
-                </div>
-
-                {/* 人臉認證區塊 */}
-                <div className="bg-white p-5 rounded-xl shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-2xl font-bold text-gray-800">人臉認證</h3>
-                            <p className="text-lg text-gray-500 mt-1">啟用後，登入或進行敏感操作時需要驗證。</p>
-                        </div>
-                        <div className="flex items-center">
-                             <span className="text-lg font-semibold text-gray-600 mr-4">未啟用</span>
-                             <button className="py-2 px-5 rounded-lg font-bold text-lg transition-colors duration-300 bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
-                                <i className="fas fa-camera mr-2"></i>啟用
+                    <div>
+                        <label htmlFor="accountId" className="block text-xl font-bold text-gray-700">帳戶 ID</label>
+                        <div className="mt-2 flex">
+                            <input 
+                                type="text" 
+                                id="accountId" 
+                                value={accountId || ''} 
+                                readOnly 
+                                className="w-full px-3 py-3 border border-gray-300 rounded-l-md bg-gray-200 text-gray-500 text-lg"
+                            />
+                            <button 
+                                type="button" 
+                                onClick={handleCopy}
+                                className="px-4 py-3 border border-l-0 border-indigo-600 rounded-r-md bg-indigo-600 text-white font-semibold hover:bg-indigo-700 text-lg flex-shrink-0"
+                            >
+                                {copySuccess ? '已複製' : '複製'}
                             </button>
                         </div>
                     </div>
+                    <div>
+                        <label htmlFor="username" className="block text-xl font-bold text-gray-700">使用者名稱</label>
+                        <input type="text" id="username" name="username" value={formData.username} onChange={handleChange} className={inputStyle}/>
+                    </div>
+                    <div>
+                        <label htmlFor="email" className="block text-xl font-bold text-gray-700">電子郵件</label>
+                        <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} className={inputStyle} readOnly/>
+                    </div>
+                    <div>
+                        <label htmlFor="phone" className="block text-xl font-bold text-gray-700">電話號碼</label>
+                        <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="請輸入您的電話號碼" className={inputStyle}/>
+                    </div>
+                     <div>
+                        <label htmlFor="referrerId" className="block text-xl font-bold text-gray-700">推薦人 ID</label>
+                        <input 
+                            type="text" 
+                            id="referrerId"
+                            name="referrerId"
+                            value={formData.referrerId} 
+                            onChange={handleChange}
+                            placeholder="請輸入推薦人的帳戶 ID (可選)"
+                            className={inputStyle}
+                        />
+                    </div>
                 </div>
 
-                {/* 儲存按鈕 */}
                 <div className="pt-2">
-                    <button className="w-full py-4 rounded-lg font-bold transition-colors bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 text-xl">
+                    <button type="submit" className="w-full py-4 rounded-lg font-bold transition-colors bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 text-xl">
                         儲存變更
                     </button>
                 </div>
-            </div>
+            </form>
         </div>
     );
 };
 
 export default EditProfilePage;
+

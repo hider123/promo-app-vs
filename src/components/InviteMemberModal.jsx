@@ -1,25 +1,29 @@
 import React, { useState } from 'react';
 
-// 邀請新成員的 Modal 元件
 const InviteMemberModal = ({ isOpen, onClose, onInvite }) => {
+    // 1. 管理表單狀態
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState('行銷專員');
-    const roles = ['首席顧問', '資深總監', '推廣經理', '行銷專員'];
+    const [role, setRole] = useState('推廣新星');
+    // 使用我們更新後的階級名稱
+    const roles = ['品牌大使', '行銷達人', '推廣新星'];
 
+    // 2. 處理表單提交
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!email) return;
         onInvite({ email, role });
+        // 提交後重設表單
         setEmail('');
-        setRole('行銷專員');
+        setRole('推廣新星');
     };
 
     if (!isOpen) return null;
 
+    // 3. 回傳 JSX 結構
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="modal-overlay-transition absolute inset-0 bg-black bg-opacity-60" onClick={onClose}></div>
-            <div className="modal-content-transition bg-white w-11/12 max-w-md mx-auto rounded-lg shadow-xl z-10 transform translate-y-0">
+            <div className="modal-content-transition bg-white w-11/12 max-w-md mx-auto rounded-lg shadow-xl z-10">
                 <form onSubmit={handleSubmit}>
                     <div className="p-6">
                         <h3 className="text-xl font-semibold text-gray-800">邀請新成員</h3>

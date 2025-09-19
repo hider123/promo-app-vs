@@ -4,9 +4,9 @@ import {
     signInWithEmailAndPassword,
     signOut,
 } from 'firebase/auth';
-import { useData } from '../context/DataContext.jsx';
+import { useAuthContext } from '../context/AuthContext.jsx';
 
-// 全新的卡通風格 Logo
+// 卡通風格 Logo
 const CartoonLogo = () => (
     <div className="bg-white p-2 border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] inline-block">
         <svg className="w-12 h-12 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -19,8 +19,9 @@ const CartoonLogo = () => (
 );
 
 
-export default function AuthPage({ auth }) {
-    const { showAlert } = useData();
+export default function AuthPage() {
+    // 1. 從 AuthContext 取得 auth 物件和 showAlert 函式
+    const { auth, showAlert } = useAuthContext();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -28,18 +29,18 @@ export default function AuthPage({ auth }) {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     
-    // Google Font 字體引入 (放在 component 內部方便管理)
+    // Google Font 字體注入
     const FontInjector = () => (
         <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap');
         `}</style>
     );
     
+    // 2. 處理認證操作
     const handleAuthAction = async (e) => {
         e.preventDefault();
         if (!auth) {
             setError("認證服務尚未準備就緒，請稍後再試。");
-            console.error("Auth object is not available.");
             return;
         }
 
@@ -63,8 +64,7 @@ export default function AuthPage({ auth }) {
                 await signInWithEmailAndPassword(auth, email, password);
             } else {
                 await createUserWithEmailAndPassword(auth, email, password);
-                await signOut(auth);
-
+                await signOut(auth); // 立即登出，讓使用者手動登入
                 showAlert(
                     '🎉 註冊成功！\n現在請用您的新帳號登入。',
                     () => {
@@ -97,15 +97,15 @@ export default function AuthPage({ auth }) {
         }
     };
 
+    // 3. 回傳 JSX 結構
     return (
         <>
             <FontInjector />
-            <div className="flex items-center justify-center min-h-screen bg-purple-50 font-['Nunito',_sans_serif] p-4 relative overflow-hidden">
-                {/* 背景裝飾 */}
+            <div className="flex items-center justify-center min-h-screen bg-purple-50 font-['Nunito',_sans-serif] p-4 relative overflow-hidden">
                 <div className="absolute -top-16 -left-16 w-48 h-48 bg-yellow-200 rounded-full opacity-50"></div>
                 <div className="absolute -bottom-24 -right-12 w-72 h-72 bg-blue-200 rounded-full opacity-50"></div>
 
-                <div className="w-full max-w-md p-8 space-y-6 bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-black">
+                <div className="w-full max-w-md p-8 space-y-8 bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-black">
                     <div className="text-center">
                         <CartoonLogo />
                         <h1 className="mt-4 text-4xl font-black text-gray-900 tracking-tight">歡迎來到 Promo!</h1>
@@ -117,45 +117,45 @@ export default function AuthPage({ auth }) {
                     <div className="flex bg-gray-200/70 p-1.5 rounded-2xl border-2 border-black">
                         <button
                             onClick={() => { setIsLogin(true); setError(''); }}
-                            className={`flex-1 py-2.5 font-bold text-center transition-all duration-300 rounded-xl ${isLogin ? 'bg-white text-purple-600 shadow-md border-2 border-black' : 'text-gray-500'}`}
+                            className={`flex-1 py-3 font-bold text-lg text-center transition-all duration-300 rounded-xl ${isLogin ? 'bg-white text-purple-600 shadow-md border-2 border-black' : 'text-gray-500'}`}
                         >
                             登入
                         </button>
                         <button
                             onClick={() => { setIsLogin(false); setError(''); }}
-                            className={`flex-1 py-2.5 font-bold text-center transition-all duration-300 rounded-xl ${!isLogin ? 'bg-white text-purple-600 shadow-md border-2 border-black' : 'text-gray-500'}`}
+                            className={`flex-1 py-3 font-bold text-lg text-center transition-all duration-300 rounded-xl ${!isLogin ? 'bg-white text-purple-600 shadow-md border-2 border-black' : 'text-gray-500'}`}
                         >
                             註冊
                         </button>
                     </div>
                     
                     {error && (
-                        <div className="p-3 text-sm font-bold text-red-800 bg-red-100 border-2 border-red-800 rounded-lg text-center" role="alert">
+                        <div className="p-4 text-base font-bold text-red-800 bg-red-100 border-2 border-red-800 rounded-lg text-center" role="alert">
                             {error}
                         </div>
                     )}
                     
-                    <form onSubmit={handleAuthAction} className="space-y-4">
+                    <form onSubmit={handleAuthAction} className="space-y-6">
                         <div>
-                            <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-1">電子郵件</label>
+                            <label htmlFor="email" className="block text-lg font-bold text-gray-700 mb-1.5">電子郵件</label>
                             <input
                                 id="email"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-black rounded-xl bg-white/50 focus:bg-white focus:ring-4 focus:ring-yellow-300 focus:outline-none transition-all"
+                                className="w-full px-4 py-3 border-2 border-black rounded-xl bg-white/50 focus:bg-white focus:ring-4 focus:ring-yellow-300 focus:outline-none transition-all text-lg"
                                 required
                                 placeholder="you@example.com"
                             />
                         </div>
                         <div>
-                            <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-1">密碼</label>
+                            <label htmlFor="password" className="block text-lg font-bold text-gray-700 mb-1.5">密碼</label>
                             <input
                                 id="password"
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-black rounded-xl bg-white/50 focus:bg-white focus:ring-4 focus:ring-yellow-300 focus:outline-none transition-all"
+                                className="w-full px-4 py-3 border-2 border-black rounded-xl bg-white/50 focus:bg-white focus:ring-4 focus:ring-yellow-300 focus:outline-none transition-all text-lg"
                                 required
                                 placeholder="••••••••"
                             />
@@ -163,13 +163,13 @@ export default function AuthPage({ auth }) {
                         
                         {!isLogin && (
                             <div>
-                                <label htmlFor="confirmPassword" className="block text-sm font-bold text-gray-700 mb-1">確認密碼</label>
+                                <label htmlFor="confirmPassword" className="block text-lg font-bold text-gray-700 mb-1.5">確認密碼</label>
                                 <input
                                     id="confirmPassword"
                                     type="password"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="w-full px-4 py-3 border-2 border-black rounded-xl bg-white/50 focus:bg-white focus:ring-4 focus:ring-yellow-300 focus:outline-none transition-all"
+                                    className="w-full px-4 py-3 border-2 border-black rounded-xl bg-white/50 focus:bg-white focus:ring-4 focus:ring-yellow-300 focus:outline-none transition-all text-lg"
                                     required
                                     placeholder="••••••••"
                                 />
@@ -177,7 +177,7 @@ export default function AuthPage({ auth }) {
                         )}
                         
                         {isLogin && (
-                            <div className="text-sm text-right">
+                            <div className="text-base text-right">
                                 <a href="#" className="font-bold text-purple-600 hover:text-purple-800">
                                     忘記密碼？
                                 </a>
@@ -187,7 +187,7 @@ export default function AuthPage({ auth }) {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full flex justify-center py-3.5 px-4 border-2 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-xl font-black text-white bg-purple-600 hover:bg-purple-700 focus:outline-none transition-all duration-150 hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:bg-purple-300 disabled:shadow-none disabled:translate-y-0"
+                            className="w-full flex justify-center py-4 px-4 border-2 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-xl font-black text-white bg-purple-600 hover:bg-purple-700 focus:outline-none transition-all duration-150 hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:bg-purple-300 disabled:shadow-none disabled:translate-y-0"
                         >
                             {isLoading && (
                                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

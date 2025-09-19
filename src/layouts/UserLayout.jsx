@@ -19,16 +19,15 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import AlertModal from '../components/AlertModal';
 
 const UserLayout = () => {
-    // 1. 從 Context 取得所需的資料和函式
+    // 1. 從各自的 Context 取得所需的資料和函式
     const { isAdmin } = useAuthContext();
     const { 
-        alert, 
-        closeAlert, 
-        showAlert, 
-        handleAddAccount, 
+        records,
         balance,
-        appSettings // 取得後台設定
+        appSettings,
+        handleAddAccount,
     } = useUserContext();
+    const { alert, closeAlert, showAlert } = useAuthContext();
     
     // 2. 管理此佈局層級的 UI 狀態
     const [currentPage, setCurrentPage] = useState('products');
@@ -40,12 +39,25 @@ const UserLayout = () => {
 
     // 3. 定義 UI 事件處理函式
     const handleGenerateClick = useCallback((product) => {
+        const pushLimit = product.pushLimit ?? appSettings?.copyPushLimit ?? 3;
+        const todayStr = new Date().toLocaleDateString('sv-SE');
+
+        const pushesForThisProductToday = (records || []).filter(r =>
+            r.type === 'commission' &&
+            r.date?.startsWith(todayStr) &&
+            r.platformDetails?.product === product.name
+        ).length;
+
+        if (pushesForThisProductToday >= pushLimit) {
+            showAlert(`此商品今日的推播次數已達上限 (${pushLimit} 次)！`);
+            return;
+        }
+
         setSelectedProduct(product);
         setIsModalOpen(true);
-    }, []);
+    }, [records, appSettings, showAlert]);
     
     const handleAttemptAddAccount = useCallback(() => {
-        // 使用來自後台設定的動態價格，若無則預設為 5 美元
         const catPoolPrice = appSettings?.catPoolPrice || 5.00;
         if (balance >= catPoolPrice) {
             setConfirmModalOpen(true);
@@ -120,7 +132,6 @@ const UserLayout = () => {
                 }}
                 title="確認新增帳號"
             >
-                {/* [核心修正] 使用來自後台設定的動態價格 */}
                 <p>每次新增帳號將從您的餘額中扣除 US${(appSettings?.catPoolPrice || 5.00).toFixed(2)} 的費用。</p>
                 <p className="mt-2 font-semibold">您確定要繼續嗎？</p>
             </ConfirmationModal>

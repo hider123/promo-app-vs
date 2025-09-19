@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo, useCallback, useState } from 'react';
 import { useAuthContext } from './AuthContext.jsx';
 import { useFirestoreListeners } from '../hooks/useFirestoreListeners.js';
-import { addData, deleteDataByRef } from '../firebase/config';
+import { addData, deleteDataByRef, updateData } from '../firebase/config';
 
 // 1. 建立 Context 物件
 const UserContext = createContext();
@@ -11,8 +11,8 @@ export const useUserContext = () => useContext(UserContext);
 
 // 3. 建立 Provider 元件 (UserProvider)
 export const UserProvider = ({ children }) => {
-    // a. 從 AuthContext 取得使用者資訊，確保只有登入的使用者才能存取
-    const { user, userId, appId } = useAuthContext();
+    // a. 從 AuthContext 取得使用者資訊和全域功能
+    const { user, userId, appId, showAlert } = useAuthContext();
     
     // b. 監聽所有「使用者專屬」和「公開」的資料集合
     const { products, poolAccounts, teamMembers, pendingInvitations, records, appSettings } = useFirestoreListeners(
@@ -23,24 +23,10 @@ export const UserProvider = ({ children }) => {
         useCallback(() => {}, [])
     );
 
-    // c. 管理前台介面的 UI 狀態 (例如：彈出提示)
-    const [alert, setAlert] = useState({ isOpen: false, message: '', onClose: null });
-
-    // d. 計算衍生狀態 (從原始資料計算出的新資料)
+    // c. 計算衍生狀態 (從原始資料計算出的新資料)
     const balance = useMemo(() => (records || []).reduce((acc, record) => acc + (record.amount || 0), 0), [records]);
     
-    // e. 封裝所有「使用者專屬」的業務邏輯
-    const showAlert = useCallback((message, onCloseCallback = null) => {
-        setAlert({ isOpen: true, message, onClose: onCloseCallback });
-    }, []);
-
-    const closeAlert = useCallback(() => {
-        if (alert.onClose) {
-            alert.onClose();
-        }
-        setAlert({ isOpen: false, message: '', onClose: null });
-    }, [alert]);
-
+    // d. 封裝所有「使用者專屬」的業務邏輯
     const handleRecharge = async (amount) => {
         if (!userId || !appId || !amount || amount <= 0) return;
         const newRecord = {
@@ -49,6 +35,7 @@ export const UserProvider = ({ children }) => {
             date: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16).replace('T', ' '),
             amount: amount,
             status: '成功',
+            userId: userId,
         };
         try {
             await addData(`artifacts/${appId}/users/${userId}/records`, newRecord);
@@ -73,6 +60,7 @@ export const UserProvider = ({ children }) => {
             platform: platforms[Math.floor(Math.random() * platforms.length)],
             avatar: `https://placehold.co/100x100/ede9fe/5b21b6?text=新`,
             createdAt: new Date(),
+            userId: userId,
         };
 
         const newExpenseRecord = {
@@ -81,6 +69,7 @@ export const UserProvider = ({ children }) => {
             date: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16).replace('T', ' '),
             amount: -catPoolPrice,
             status: '成功',
+            userId: userId,
         };
         
         try {
@@ -115,8 +104,32 @@ export const UserProvider = ({ children }) => {
             }, 3000);
         } catch (error) { console.error("送出邀請失敗: ", error); }
     };
+
+    const updateUserProfile = async (profileData) => {
+        if (!userId || !appId || !teamMembers) {
+            showAlert("錯誤：無法更新個人資料，使用者資料不完整。");
+            return;
+        }
+        const currentUserInTeam = (teamMembers || []).find(member => member.userId === userId);
+        if (currentUserInTeam) {
+            try {
+                const dataToUpdate = {
+                    name: profileData.username,
+                    referrerId: profileData.referrerId,
+                    phone: profileData.phone,
+                };
+                await updateData(`artifacts/${appId}/public/data/team_members`, currentUserInTeam.id, dataToUpdate);
+                showAlert('個人資料已成功儲存！');
+            } catch (error) {
+                console.error("更新個人資料失敗:", error);
+                showAlert('儲存失敗，請稍後再試。');
+            }
+        } else {
+            showAlert('錯誤：在團隊中找不到您的資料。');
+        }
+    };
     
-    // f. 組合所有要提供給前台子元件的 value
+    // e. 組合所有要提供給前台子元件的 value
     const value = {
         products,
         appSettings,
@@ -125,15 +138,14 @@ export const UserProvider = ({ children }) => {
         pendingInvitations,
         records,
         balance,
-        alert,
-        showAlert,
-        closeAlert,
+        // showAlert 和 closeAlert 由 AuthContext 提供，這裡不再重複提供
         handleRecharge,
         handleAddAccount,
         handleInvite,
+        updateUserProfile,
     };
 
-    // g. 透過 Provider 將 value 廣播出去
+    // f. 透過 Provider 將 value 廣播出去
     return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 };
 

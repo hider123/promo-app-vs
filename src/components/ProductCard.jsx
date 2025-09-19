@@ -1,20 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+// [核心修正] 引入 UserContext Hook，以取得推播記錄
+import { useUserContext } from '../context/UserContext.jsx';
 
 // 一個獨立的、可重複使用的倒數計時邏輯 Hook
-const useCountdown = (createdAt) => {
+const useCountdown = (deadlineISOString) => {
     const calculateTimeLeft = () => {
-        if (!createdAt) return null;
+        if (!deadlineISOString) return null;
         
-        let creationDate;
-        if (createdAt && typeof createdAt.toDate === 'function') {
-            creationDate = createdAt.toDate();
-        } else if (typeof createdAt === 'string') {
-            creationDate = new Date(createdAt);
-        } else {
-            return null;
-        }
-
-        const targetDate = creationDate.getTime() + 2 * 24 * 60 * 60 * 1000;
+        const targetDate = new Date(deadlineISOString).getTime();
         const now = new Date().getTime();
         const difference = targetDate - now;
 
@@ -34,14 +27,12 @@ const useCountdown = (createdAt) => {
     const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
 
     useEffect(() => {
-        if (!createdAt || timeLeft?.expired) return;
-
+        if (!deadlineISOString || timeLeft?.expired) return;
         const timer = setInterval(() => {
             setTimeLeft(calculateTimeLeft());
         }, 1000);
-
         return () => clearInterval(timer);
-    }, [createdAt, timeLeft?.expired]);
+    }, [deadlineISOString, timeLeft?.expired]);
 
     return timeLeft;
 };
@@ -65,13 +56,54 @@ const CountdownTimer = ({ timeLeft }) => {
     );
 };
 
+// [核心修正] 一個全新的、用來顯示剩餘推播次數的元件
+const PushCountDisplay = ({ count, limit }) => {
+    const remainingCount = limit - count;
+    const isLimited = remainingCount <= 0;
+
+    return (
+        <div className="flex items-center text-sm font-medium text-gray-600" title={`今日剩餘推播次數`}>
+            <i className={`fas fa-bullhorn mr-2 ${isLimited ? 'text-gray-400' : 'text-indigo-500'}`}></i>
+            <span>剩餘次數: </span>
+            <span className={`font-semibold ml-1 ${isLimited ? 'text-red-500' : 'text-gray-800'}`}>
+                {remainingCount} / {limit}
+            </span>
+        </div>
+    );
+};
+
+
 const ProductCard = ({ product, onGenerateClick }) => {
-    const timeLeft = useCountdown(product.createdAt);
+    // 1. 從 UserContext 取得推播記錄
+    const { records } = useUserContext();
+    const timeLeft = useCountdown(product.deadline);
+
+    // 2. 計算此商品今日的推播次數
+    const pushesToday = useMemo(() => {
+        if (!records) return 0;
+        const todayStr = new Date().toLocaleDateString('sv-SE');
+        return records.filter(r =>
+            r.type === 'commission' &&
+            r.date?.startsWith(todayStr) &&
+            r.platformDetails?.product === product.name
+        ).length;
+    }, [records, product.name]);
+
+    const pushLimit = product.pushLimit ?? 100;
 
     const handleImageError = (e) => {
         const productName = e.target.alt || '商品';
         e.target.src = `https://placehold.co/600x400/e2e8f0/475569?text=${encodeURIComponent(productName)}`;
     };
+
+    const getProductTag = () => {
+        if (product.popularity && product.popularity >= 4) {
+            return { text: '熱銷', color: 'bg-red-500' };
+        }
+        return product.tag;
+    };
+    
+    const displayTag = getProductTag();
 
     return (
         <div className="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 transition-transform duration-300 flex flex-col">
@@ -82,14 +114,13 @@ const ProductCard = ({ product, onGenerateClick }) => {
                     className="w-full h-48 object-cover" 
                     onError={handleImageError}
                 />
-                {product.tag && (
-                    <div className={`absolute top-2 ${product.tag.text === '熱銷' ? 'right-2' : 'left-2'} ${product.tag.color} text-white text-xs font-bold px-2 py-1 rounded-full`}>
-                        {product.tag.text}
+                {displayTag && (
+                    <div className={`absolute top-2 left-2 ${displayTag.color} text-white text-xs font-bold px-2 py-1 rounded-full`}>
+                        {displayTag.text}
                     </div>
                 )}
             </div>
             <div className="p-4 flex flex-col flex-grow">
-                {/* 頂部內容: 標題和描述 */}
                 <div>
                     <h3 className="text-lg font-semibold text-gray-800 truncate" title={product.name}>{product.name}</h3>
                     <p className="text-gray-500 text-sm mt-1 h-10 overflow-hidden text-ellipsis" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
@@ -97,20 +128,15 @@ const ProductCard = ({ product, onGenerateClick }) => {
                     </p>
                 </div>
 
-                {/* 這是一個彈性空間，會自動伸展，將下方的內容推至卡片底部 */}
                 <div className="flex-grow"></div>
 
-                {/* 底部內容 */}
                 <div className="space-y-3 mt-3">
                     <div className="flex items-center justify-between">
                         <p className="text-xl font-bold text-indigo-600">{product.price}</p>
-                        <div className="flex items-center text-yellow-400">
-                            <i className="fas fa-star"></i>
-                            <span className="ml-1 text-gray-600 font-medium">{product.rating}</span>
-                        </div>
+                        {/* [核心修正] 將星級評分替換為剩餘推播次數 */}
+                        <PushCountDisplay count={pushesToday} limit={pushLimit} />
                     </div>
                     
-                    {/* 給予固定高度，防止倒數計時器出現時畫面跳動 */}
                     <div className="h-9">
                         <CountdownTimer timeLeft={timeLeft} />
                     </div>

@@ -9,7 +9,12 @@ const SettingsPage = () => {
     const [settings, setSettings] = useState({
         catPoolPrice: 5.00,
         commissionRate: 0.05,
-        copyPushCommission: 1.50
+        copyPushCommission: 1.50,
+        copyPushLimit: 3,
+        midTierThreshold: 20,
+        highTierThreshold: 100,
+        buyInRate: 7.5,
+        sellOutRate: 7.0,
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -40,7 +45,6 @@ const SettingsPage = () => {
             <h1 className="text-3xl font-bold text-gray-800">系統設定</h1>
 
             <form onSubmit={handleSubmit} className="bg-white p-4 rounded-lg shadow-sm space-y-6">
-                {/* 貓池帳號金額設定 */}
                 <div>
                     <h2 className="text-lg font-semibold text-gray-800">貓池設定</h2>
                     <div className="mt-4">
@@ -63,9 +67,8 @@ const SettingsPage = () => {
                     </div>
                 </div>
 
-                {/* 用戶佣金金額設定 */}
                 <div>
-                    <h2 className="text-lg font-semibold text-gray-800">佣金設定</h2>
+                    <h2 className="text-lg font-semibold text-gray-800">佣金與推播設定</h2>
                     <div className="mt-4">
                         <label htmlFor="commissionRate" className="block text-sm font-medium text-gray-700">推播成功佣金率 (%)</label>
                         <div className="mt-1 relative rounded-md shadow-sm">
@@ -73,9 +76,7 @@ const SettingsPage = () => {
                                 type="number"
                                 name="commissionRate"
                                 id="commissionRate"
-                                // 將 0.05 轉換為 5 (%) 來顯示
                                 value={(settings.commissionRate || 0) * 100}
-                                // 在儲存時，將 5 (%) 轉換回 0.05
                                 onChange={(e) => setSettings(prev => ({ ...prev, commissionRate: parseFloat(e.target.value) / 100 }))}
                                 className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pr-12 sm:text-sm border-gray-300 rounded-md"
                                 placeholder="5"
@@ -104,9 +105,81 @@ const SettingsPage = () => {
                             />
                         </div>
                     </div>
+                    <div className="mt-4">
+                        <label htmlFor="copyPushLimit" className="block text-sm font-medium text-gray-700">每日文案推播上限 (次數)</label>
+                        <input
+                            type="number"
+                            name="copyPushLimit"
+                            id="copyPushLimit"
+                            value={settings.copyPushLimit || ''}
+                            onChange={handleChange}
+                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            placeholder="例如：3"
+                            step="1"
+                        />
+                    </div>
+                </div>
+                
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-800">會員階級設定</h2>
+                    <div className="mt-4">
+                        <label htmlFor="midTierThreshold" className="block text-sm font-medium text-gray-700">中階升級條件 (貓池購買數量)</label>
+                        <input
+                            type="number"
+                            name="midTierThreshold"
+                            id="midTierThreshold"
+                            value={settings.midTierThreshold || ''}
+                            onChange={handleChange}
+                            className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            placeholder="例如：20"
+                            step="1"
+                        />
+                    </div>
+                     <div className="mt-4">
+                        <label htmlFor="highTierThreshold" className="block text-sm font-medium text-gray-700">高階升級條件 (貓池購買數量)</label>
+                        <input
+                            type="number"
+                            name="highTierThreshold"
+                            id="highTierThreshold"
+                            value={settings.highTierThreshold || ''}
+                            onChange={handleChange}
+                            className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            placeholder="例如：100"
+                            step="1"
+                        />
+                    </div>
                 </div>
 
-                {/* 儲存按鈕 */}
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-800">匯率設定</h2>
+                    <div className="mt-4">
+                        <label htmlFor="buyInRate" className="block text-sm font-medium text-gray-700">買進匯率</label>
+                        <input
+                            type="number"
+                            name="buyInRate"
+                            id="buyInRate"
+                            value={settings.buyInRate || ''}
+                            onChange={handleChange}
+                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            placeholder="例如：7.5"
+                            step="0.01"
+                        />
+                    </div>
+                     <div className="mt-4">
+                        <label htmlFor="sellOutRate" className="block text-sm font-medium text-gray-700">賣出匯率</label>
+                        <input
+                            type="number"
+                            name="sellOutRate"
+                            id="sellOutRate"
+                            value={settings.sellOutRate || ''}
+                            onChange={handleChange}
+                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            placeholder="例如：7.0"
+                            step="0.01"
+                        />
+                    </div>
+                </div>
+
                 <div className="pt-2 border-t">
                      <button
                         type="submit"
