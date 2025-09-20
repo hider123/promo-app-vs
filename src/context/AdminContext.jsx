@@ -8,7 +8,7 @@ export const useAdminContext = () => useContext(AdminContext);
 
 export const AdminProvider = ({ children }) => {
     const { appId, user, showAlert } = useAuthContext();
-    const { products, appSettings, allUserRecords, allTeamMembers, allPoolAccounts } = useFirestoreListeners('admin', appId, user?.uid, !!user, useCallback(() => {}, []));
+    const { products, appSettings, allUsers } = useFirestoreListeners('admin', appId, user?.uid, !!user, useCallback(() => {}, []));
 
     const handleUpdateSettings = async (newSettings) => {
         if (!appId) return;
@@ -113,9 +113,7 @@ export const AdminProvider = ({ children }) => {
     const value = {
         products,
         appSettings,
-        allUserRecords,
-        allTeamMembers,
-        allPoolAccounts,
+        allUsers,
         handleAddProduct,
         handleAddMultipleProducts,
         handleUpdateProduct,

@@ -24,7 +24,7 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
     const [teamMembers, setTeamMembers] = useState([]);
     const [pendingInvitations, setPendingInvitations] = useState([]);
     const [records, setRecords] = useState([]);
-    const [allUserRecords, setAllUserRecords] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
 
     // 2. 使用 useEffect 來處理副作用（設定監聽器）
     useEffect(() => {
@@ -49,14 +49,14 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
             { name: 'poolAccounts', setter: setPoolAccounts, initialData: initialPoolAccountsData, isPublic: false, scope: ['user'], seedOnEmpty: true },
             { name: 'records', setter: setRecords, initialData: initialRecordsData, isPublic: false, scope: ['user'], seedOnEmpty: true },
 
-            // --- 集合群組 (僅限 'admin' scope) ---
+            // --- 管理員資料 (僅限 'admin' scope) ---
             { 
-                name: 'records', 
-                setter: setAllUserRecords, 
-                isPublic: false, 
+                name: 'users', 
+                setter: setAllUsers, 
+                isPublic: true, // 'users' 集合通常是公開讀取的，但寫入受限
                 scope: ['admin'], 
-                isCollectionGroup: true,
-                queryConstraints: [where('type', '==', 'commission')]
+                isCollectionGroup: false, // 這是一個頂層集合，不是集合組
+                queryConstraints: [] // 初始獲取所有用戶，不做篩選
             },
         ];
         
@@ -72,6 +72,6 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
     }, [scope, isReadyToListen, userId, appId, onInitialLoadComplete]);
 
     // 3. 回傳所有資料狀態
-    return { appSettings, products, poolAccounts, teamMembers, pendingInvitations, records, allUserRecords };
+    return { appSettings, products, poolAccounts, teamMembers, pendingInvitations, records, allUsers };
 };
 
