@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+// [核心修正] 引入新的 Context Hooks
 import { useUserContext } from '../context/UserContext.jsx';
 import { useAuthContext } from '../context/AuthContext.jsx';
 
@@ -19,15 +20,14 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import AlertModal from '../components/AlertModal';
 
 const UserLayout = () => {
-    // 1. 從各自的 Context 取得所需的資料和函式
-    const { isAdmin } = useAuthContext();
+    // 1. [核心修正] 從各自的 Context 取得所需的資料和函式
+    const { isAdmin, alert, closeAlert, showAlert } = useAuthContext();
     const { 
         records,
         balance,
         appSettings,
         handleAddAccount,
     } = useUserContext();
-    const { alert, closeAlert, showAlert } = useAuthContext();
     
     // 2. 管理此佈局層級的 UI 狀態
     const [currentPage, setCurrentPage] = useState('products');

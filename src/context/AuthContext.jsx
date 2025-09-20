@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
     // b. 判斷當前使用者是否為管理員
     const isAdmin = useMemo(() => user ? ADMIN_UIDS.includes(user.uid) : false, [user]);
 
-    // c. [核心修正] 將全域提示系統移至此處
+    // c. [核心邏輯] 將全域提示系統統一放在此處
     const [alert, setAlert] = useState({ isOpen: false, message: '', onClose: null });
 
     const showAlert = useCallback((message, onCloseCallback = null) => {
@@ -53,7 +53,6 @@ export const AuthProvider = ({ children }) => {
         initError,
         isAdmin,
         handleSignOut,
-        // [核心修正] 將 alert 相關的功能由此提供
         alert,
         showAlert,
         closeAlert,

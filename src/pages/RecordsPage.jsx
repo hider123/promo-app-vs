@@ -49,7 +49,7 @@ const RecordsPage = () => {
     };
 
     // 4. 使用 useMemo 將篩選、排序、分頁和分組的邏輯包起來
-    const { groupedRecords, pageCount } = useMemo(() => {
+    const { groupedRecords, pageCount, startIndex } = useMemo(() => {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const yesterday = new Date(today);
@@ -79,14 +79,9 @@ const RecordsPage = () => {
         
         const sorted = [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
         
-        // 計算總頁數
         const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE);
-
-        // 取得當前頁面的資料
-        const paginatedItems = sorted.slice(
-            (currentPage - 1) * ITEMS_PER_PAGE,
-            currentPage * ITEMS_PER_PAGE
-        );
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        const paginatedItems = sorted.slice(start, start + ITEMS_PER_PAGE);
 
         const grouped = paginatedItems.reduce((acc, record) => {
             const category = getDateCategory(record.date);
@@ -97,13 +92,15 @@ const RecordsPage = () => {
             return acc;
         }, {});
         
-        return { groupedRecords: grouped, pageCount: totalPages };
+        return { groupedRecords: grouped, pageCount: totalPages, startIndex: start };
     }, [records, activeFilter, currentPage]);
 
     // 監聽篩選條件變化，如果改變則重設為第一頁
     useEffect(() => {
         setCurrentPage(1);
     }, [activeFilter]);
+
+    let itemIndex = startIndex;
 
     return (
         <div className="space-y-6 p-4">
@@ -130,39 +127,42 @@ const RecordsPage = () => {
                             <div key={dateGroup}>
                                 <h3 className="bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-600 sticky top-0">{dateGroup}</h3>
                                 <ul className="divide-y divide-gray-200">
-                                    {groupedRecords[dateGroup].map(record => (
-                                        <li key={record.id} className="p-4">
-                                            <div className="flex items-start justify-between space-x-4">
-                                                <div className="flex items-start space-x-4 min-w-0">
-                                                    <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center ${record.status === '成功' ? 'bg-green-100' : 'bg-red-100'}`}>
-                                                        <i className={`fas ${record.status === '成功' ? 'fa-check text-green-600' : 'fa-times text-red-600'}`}></i>
+                                    {groupedRecords[dateGroup].map(record => {
+                                        itemIndex++;
+                                        return (
+                                            <li key={record.id} className="p-4">
+                                                <div className="flex items-start justify-between space-x-4">
+                                                    <div className="flex items-start space-x-4 min-w-0">
+                                                        <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full font-bold text-gray-600 text-sm">
+                                                            {itemIndex}
+                                                        </div>
+                                                        {/* [核心修正] 移除狀態圖示的 div */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-medium text-gray-800">
+                                                                <span className="font-semibold text-indigo-600">{record.platformDetails?.account}</span> 將 <span className="font-semibold text-indigo-600">{record.platformDetails?.product}</span> 推播至 <span className="font-semibold text-indigo-600">{record.platformDetails?.targetPlatform}</span>
+                                                            </p>
+                                                            <div className="flex items-center text-sm text-gray-500 mt-1">
+                                                                <i className={`${getPlatformIcon(record.platformDetails?.platform)} mr-2`}></i>
+                                                                <span>{record.platformDetails?.platform}</span>
+                                                                <span className="mx-2">•</span>
+                                                                <span>{record.date}</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-medium text-gray-800">
-                                                            <span className="font-semibold text-indigo-600">{record.platformDetails?.account}</span> 將 <span className="font-semibold text-indigo-600">{record.platformDetails?.product}</span> 推播至 <span className="font-semibold text-indigo-600">{record.platformDetails?.targetPlatform}</span>
-                                                        </p>
-                                                        <div className="flex items-center text-sm text-gray-500 mt-1">
-                                                            <i className={`${getPlatformIcon(record.platformDetails?.platform)} mr-2`}></i>
-                                                            <span>{record.platformDetails?.platform}</span>
-                                                            <span className="mx-2">•</span>
-                                                            <span>{record.date}</span>
+                                                    <div className="text-right flex-shrink-0">
+                                                        <span className={`text-sm font-semibold ${record.status === '成功' ? 'text-green-600' : 'text-red-600'}`}>{record.status}</span>
+                                                        <div className="text-sm text-gray-700 mt-1">
+                                                            <span className="font-medium">獎勵佣金: </span>
+                                                            <span className={`font-bold ml-1 ${record.status === '成功' ? 'text-green-700' : 'text-gray-500'}`}>{`US$${(record.amount || 0).toFixed(2)}`}</span>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="text-right flex-shrink-0">
-                                                    <span className={`text-sm font-semibold ${record.status === '成功' ? 'text-green-600' : 'text-red-600'}`}>{record.status}</span>
-                                                    <div className="text-sm text-gray-700 mt-1">
-                                                        <span className="font-medium">獎勵佣金: </span>
-                                                        <span className={`font-bold ml-1 ${record.status === '成功' ? 'text-green-700' : 'text-gray-500'}`}>{`US$${(record.amount || 0).toFixed(2)}`}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </li>
-                                    ))}
+                                            </li>
+                                        )
+                                    })}
                                 </ul>
                             </div>
                         ))}
-                        {/* 5. 新增分頁控制項 */}
                         {pageCount > 1 && (
                             <div className="flex justify-center items-center gap-4 p-4 border-t">
                                 <button

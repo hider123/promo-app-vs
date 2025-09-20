@@ -44,14 +44,17 @@ const ScoutImage = ({ src, alt, onGenerated }) => {
 };
 
 const AIScoutModal = ({ isOpen, onClose, keyword }) => {
+    // 1. 從 Context 取得所需的函式
     const { handleAddMultipleProducts, showAlert } = useAdminContext();
+    
+    // 2. 管理此元件自身的 UI 狀態
     const [isLoading, setIsLoading] = useState(true);
     const [statusText, setStatusText] = useState('AI 正在為您搜尋中...');
     const [error, setError] = useState(null);
     const [scoutedProducts, setScoutedProducts] = useState([]);
-    // [核心修正] 新增 state 來管理被選中的商品
     const [selectedProducts, setSelectedProducts] = useState(new Set());
 
+    // 3. 定義核心函式
     const handleGeneratedImage = (index, newBase64Url) => {
         setScoutedProducts(prev => {
             const newProducts = [...prev];
@@ -75,7 +78,6 @@ const AIScoutModal = ({ isOpen, onClose, keyword }) => {
 
         try {
             setStatusText('正在搜尋商品資訊...');
-            // [核心修正] 更新提示，要求 AI 產生 5 個結果
             const userQuery = `身為一位專業的電商產品研究員，請根據以下關鍵字，在全球網路上搜尋五款最受歡迎、評價最高的相關產品。請以繁體中文回傳。關鍵字：「${searchKeyword}」`;
             const schema = {
                 type: "ARRAY",
@@ -125,11 +127,9 @@ const AIScoutModal = ({ isOpen, onClose, keyword }) => {
         }
     }, [isOpen, keyword, fetchAIProducts]);
 
-    // [核心修正] 處理商品選取狀態的變更
     const handleSelectionChange = (product) => {
         setSelectedProducts(prev => {
             const newSelection = new Set(prev);
-            // 這裡我們比較商品名稱來判斷是否為同一個商品
             const existingProduct = [...newSelection].find(p => p.name === product.name);
             if (existingProduct) {
                 newSelection.delete(existingProduct);
@@ -140,7 +140,6 @@ const AIScoutModal = ({ isOpen, onClose, keyword }) => {
         });
     };
 
-    // [核心修正] 處理批次新增的函式
     const handleAddSelected = async () => {
         if (selectedProducts.size === 0) {
             showAlert('請至少選擇一個商品。');

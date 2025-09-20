@@ -3,24 +3,12 @@ import { useAuthContext } from './AuthContext.jsx';
 import { useFirestoreListeners } from '../hooks/useFirestoreListeners.js';
 import { addData, updateData, deleteData, uploadBase64AsFile } from '../firebase/config';
 
-// 1. 建立 Context 物件
 const AdminContext = createContext();
-
-// 2. 建立一個自定義 Hook (useAdminContext)，方便後台元件存取
 export const useAdminContext = () => useContext(AdminContext);
 
-// 3. 建立 Provider 元件 (AdminProvider)
 export const AdminProvider = ({ children }) => {
-    // a. 從 AuthContext 取得 AppID 和使用者資訊
-    const { appId, user } = useAuthContext();
-    
-    // b. 呼叫「資料雷達」，並明確告知 scope 是 'admin'
-    const { products, appSettings, allUserRecords } = useFirestoreListeners('admin', appId, user?.uid, !!user, useCallback(() => {}, []));
-    const [alert, setAlert] = useState({ isOpen: false, message: '' });
-
-    // c. 封裝所有「管理員專屬」的業務邏輯
-    const showAlert = useCallback((message) => setAlert({ isOpen: true, message }), []);
-    const closeAlert = useCallback(() => setAlert({ isOpen: false, message: '' }), []);
+    const { appId, user, showAlert } = useAuthContext();
+    const { products, appSettings, allUserRecords, allTeamMembers, allPoolAccounts } = useFirestoreListeners('admin', appId, user?.uid, !!user, useCallback(() => {}, []));
 
     const handleUpdateSettings = async (newSettings) => {
         if (!appId) return;
@@ -34,37 +22,56 @@ export const AdminProvider = ({ children }) => {
     };
 
     const handleAddProduct = async (productData) => {
-        if (!appId) return;
-        try {
-            let finalImageUrl = productData.image_url || productData.image;
-            if (finalImageUrl && finalImageUrl.startsWith('data:image/png;base64,')) {
-                showAlert('正在將 AI 生成的圖片上傳至雲端...');
-                finalImageUrl = await uploadBase64AsFile(finalImageUrl, 'products/', productData.name);
-            }
-            const priceString = typeof productData.price === 'number' ? `US$${productData.price.toFixed(2)}` : productData.price;
-            
-            const defaultDeadline = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+        // 這個函式保留給「手動新增」使用
+        await handleAddMultipleProducts([productData]);
+    };
 
-            const newProduct = {
-                name: productData.name || '未命名商品',
-                description: productData.description || '無描述',
-                price: priceString,
-                category: productData.category || '未分類',
-                rating: '4.5',
-                image: finalImageUrl || `https://placehold.co/600x400/e2e8f0/475569?text=${encodeURIComponent(productData.name || '商品')}`,
-                createdAt: new Date().toISOString(),
-                deadline: productData.deadline || defaultDeadline,
-                status: 'draft',
-                pushLimit: productData.pushLimit || 100,
-                popularity: productData.popularity || 5,
-                commissionMin: productData.commissionMin || 0.2,
-                commissionMax: productData.commissionMax || 0.5,
-                tag: { text: '新品', color: 'bg-blue-500' }
-            };
-            await addData(`artifacts/${appId}/public/data/products`, newProduct);
-            showAlert('🎉 商品新增成功！');
+    // [核心修正] 建立一個新的函式來處理批次新增
+    const handleAddMultipleProducts = async (productsToAdd) => {
+        if (!appId || !productsToAdd || productsToAdd.length === 0) return;
+        
+        showAlert(`正在處理 ${productsToAdd.length} 件商品...`);
+
+        try {
+            // 使用 Promise.all 來並行處理所有商品的圖片上傳和資料準備
+            const newProductsPromises = productsToAdd.map(async (productData) => {
+                let finalImageUrl = productData.image_url || productData.image;
+
+                if (finalImageUrl && finalImageUrl.startsWith('data:image/png;base64,')) {
+                    finalImageUrl = await uploadBase64AsFile(finalImageUrl, 'products/', productData.name);
+                }
+                
+                const priceString = typeof productData.price === 'number' ? `US$${productData.price.toFixed(2)}` : productData.price;
+                const defaultDeadline = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+
+                return {
+                    name: productData.name || '未命名商品',
+                    description: productData.description || '無描述',
+                    price: priceString,
+                    category: productData.category || '未分類',
+                    rating: '4.5',
+                    image: finalImageUrl || `https://placehold.co/600x400/e2e8f0/475569?text=${encodeURIComponent(productData.name || '商品')}`,
+                    createdAt: new Date().toISOString(),
+                    deadline: productData.deadline || defaultDeadline,
+                    status: 'draft',
+                    pushLimit: productData.pushLimit || 100,
+                    popularity: productData.popularity || 5,
+                    commissionMin: productData.commissionMin || 0.2,
+                    commissionMax: productData.commissionMax || 0.5,
+                    tag: { text: '新品', color: 'bg-blue-500' }
+                };
+            });
+            
+            const newProducts = await Promise.all(newProductsPromises);
+
+            // 一次性將所有準備好的商品寫入資料庫
+            for (const newProduct of newProducts) {
+                await addData(`artifacts/${appId}/public/data/products`, newProduct);
+            }
+
+            showAlert(`🎉 成功新增 ${newProducts.length} 件商品！`);
         } catch (error) {
-            console.error("新增商品失敗:", error);
+            console.error("批次新增商品失敗:", error);
             showAlert(`新增商品失敗：${error.message}`);
         }
     };
@@ -103,22 +110,20 @@ export const AdminProvider = ({ children }) => {
         }
     };
 
-    // d. 組合所有要提供給後台子元件的 value
     const value = {
         products,
         appSettings,
         allUserRecords,
-        alert,
-        showAlert,
-        closeAlert,
+        allTeamMembers,
+        allPoolAccounts,
         handleAddProduct,
+        handleAddMultipleProducts,
         handleUpdateProduct,
         handleDeleteProduct,
         handleUpdateSettings,
         handleTogglePublishStatus,
     };
 
-    // e. 透過 Provider 將 value 廣播出去
     return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
 };
 

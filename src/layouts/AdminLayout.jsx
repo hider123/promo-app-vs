@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
+// [核心修正] 引入 AuthContext Hook
 import { useAuthContext } from '../context/AuthContext.jsx';
-import { useAdminContext } from '../context/AdminContext.jsx';
 import AlertModal from '../components/AlertModal.jsx';
 import AdminPage from '../pages/admin/AdminPage.jsx';
 import SettingsPage from '../pages/admin/SettingsPage.jsx';
-// [核心修正] 引入新的用戶頁面
+import RechargeSettingsPage from '../pages/admin/RechargeSettingsPage.jsx';
 import UsersPage from '../pages/admin/UsersPage.jsx';
 
 const AdminLayout = () => {
-    // 1. 從 Context 取得所需的資料和函式
-    const { handleSignOut } = useAuthContext();
-    const { alert, closeAlert } = useAdminContext();
+    // 1. [核心修正] 從 useAuthContext 一次性取得所有需要的函式和狀態
+    const { handleSignOut, alert, closeAlert } = useAuthContext();
     
     // 2. 管理後台當前顯示的分頁狀態
     const [activeTab, setActiveTab] = useState('products');
@@ -20,7 +19,8 @@ const AdminLayout = () => {
         switch (activeTab) {
             case 'settings':
                 return <SettingsPage />;
-            // [核心修正] 處理用戶頁面的渲染
+            case 'recharge':
+                return <RechargeSettingsPage />;
             case 'users':
                 return <UsersPage />;
             case 'products':
@@ -42,8 +42,8 @@ const AdminLayout = () => {
                         {/* 後台導覽列 */}
                         <nav className="flex gap-4">
                             <button onClick={() => setActiveTab('products')} className={`font-semibold ${activeTab === 'products' ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-600'}`}>商品管理</button>
-                            {/* [核心修正] 新增用戶管理頁籤 */}
                             <button onClick={() => setActiveTab('users')} className={`font-semibold ${activeTab === 'users' ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-600'}`}>用戶管理</button>
+                            <button onClick={() => setActiveTab('recharge')} className={`font-semibold ${activeTab === 'recharge' ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-600'}`}>充值設定</button>
                             <button onClick={() => setActiveTab('settings')} className={`font-semibold ${activeTab === 'settings' ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-600'}`}>系統設定</button>
                         </nav>
                     </div>
