@@ -11,15 +11,17 @@ import AccountPage from '../pages/Account/AccountPage';
 import EditProfilePage from '../pages/Account/EditProfilePage';
 import TransactionsPage from '../pages/Account/TransactionsPage';
 import PaymentChannelsPage from '../pages/Account/PaymentChannelsPage.jsx';
-import WithdrawalSettingsPage from '../pages/Account/WithdrawalSettingsPage.jsx'; // [新增] 引入新的設定頁面
+import WithdrawalSettingsPage from '../pages/Account/WithdrawalSettingsPage.jsx';
 
 // 共用元件
 import BottomTabBar from '../components/BottomTabBar';
 import GenerationModal from '../components/GenerationModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+// [還原] 在此處重新引入 AlertModal
 import AlertModal from '../components/AlertModal';
 
 const UserLayout = () => {
+    // [還原] 從 Context 中重新取回 alert 和 closeAlert
     const { isAdmin, alert, closeAlert, showAlert } = useAuthContext();
     const { 
         records,
@@ -63,7 +65,6 @@ const UserLayout = () => {
         }
     }, [balance, showAlert, appSettings]);
 
-    // [修改] 頁面渲染邏輯
     const renderAccountPage = () => {
         switch (accountView) {
             case 'editProfile':
@@ -72,7 +73,7 @@ const UserLayout = () => {
                 return <TransactionsPage onBack={() => setAccountView('main')} />;
             case 'paymentChannels':
                 return <PaymentChannelsPage onBack={() => setAccountView('main')} amount={rechargeAmount} />;
-            case 'withdrawalSettings': // [新增] 增加一個新的 case
+            case 'withdrawalSettings':
                 return <WithdrawalSettingsPage onBack={() => setAccountView('main')} />;
             case 'main':
             default:
@@ -105,7 +106,7 @@ const UserLayout = () => {
             <button
                 onClick={() => setCurrentPage('account')}
                 className={`fixed top-4 right-4 z-30 flex items-center justify-center h-14 w-14 rounded-full bg-white shadow-lg transition-all duration-300 transform hover:scale-110 hover:shadow-xl ${currentPage === 'account' ? 'ring-4 ring-indigo-400' : 'ring-2 ring-gray-200'}`}
-                aria-label="我的帳號"
+                aria-label="我的帳戶"
             >
                 <i className="fas fa-user-circle text-3xl text-indigo-600"></i>
             </button>
@@ -133,6 +134,7 @@ const UserLayout = () => {
                 <p>每次新增帳號將從您的餘額中扣除 US${(appSettings?.catPoolPrice || 5.00).toFixed(2)} 的費用。</p>
                 <p className="mt-2 font-semibold">您確定要繼續嗎？</p>
             </ConfirmationModal>
+            {/* [還原] 在此處重新渲染 AlertModal */}
             <AlertModal 
                 isOpen={alert.isOpen}
                 onClose={closeAlert}

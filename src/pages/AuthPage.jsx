@@ -20,7 +20,7 @@ const CartoonLogo = () => (
 
 
 export default function AuthPage() {
-    // 1. 從 AuthContext 取得 auth 物件和 showAlert 函式
+    // [還原] 不再需要 closeAlert
     const { auth, showAlert } = useAuthContext();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
@@ -29,14 +29,12 @@ export default function AuthPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     
-    // Google Font 字體注入
     const FontInjector = () => (
         <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap');
         `}</style>
     );
     
-    // 2. 處理認證操作
     const handleAuthAction = async (e) => {
         e.preventDefault();
         if (!auth) {
@@ -62,9 +60,13 @@ export default function AuthPage() {
         try {
             if (isLogin) {
                 await signInWithEmailAndPassword(auth, email, password);
+                // 登入成功後，App.jsx 中的 onAuthStateChanged 會自動處理跳轉
             } else {
+                // [還原] 恢復為原始的、正確的註冊 -> 登出流程
                 await createUserWithEmailAndPassword(auth, email, password);
-                await signOut(auth); // 立即登出，讓使用者手動登入
+                await signOut(auth); // 立即登出
+                
+                // 顯示成功提示，並在使用者確認後切換到登入介面
                 showAlert(
                     '🎉 註冊成功！\n現在請用您的新帳號登入。',
                     () => {
@@ -83,7 +85,8 @@ export default function AuthPage() {
                 case 'auth/user-not-found':
                 case 'auth/wrong-password':
                 case 'auth/invalid-credential':
-                    setError('Email 或密碼好像不太對喔？');
+                    // [新增] 針對首次登入可能失敗的情況，提供更明確的提示
+                    setError('Email 或密碼錯誤。如果您是新註冊用戶，請稍候 10 秒再試，以便後台為您建立資料。');
                     break;
                 case 'auth/invalid-email':
                     setError('這個 Email 格式怪怪的喔～');
@@ -97,7 +100,6 @@ export default function AuthPage() {
         }
     };
 
-    // 3. 回傳 JSX 結構
     return (
         <>
             <FontInjector />
@@ -203,4 +205,3 @@ export default function AuthPage() {
         </>
     );
 }
-

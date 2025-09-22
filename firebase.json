@@ -19,7 +19,7 @@
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" install"
       ],
-      "runtime": "nodejs22"
+      "runtime": "nodejs18"
     }
   ],
   "emulators": {
