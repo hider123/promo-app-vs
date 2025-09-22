@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useMemo } from 'react';
-// [核心修正] 引入新的 Context Hooks
 import { useUserContext } from '../context/UserContext.jsx';
 import { useAuthContext } from '../context/AuthContext.jsx';
 
@@ -12,6 +11,7 @@ import AccountPage from '../pages/Account/AccountPage';
 import EditProfilePage from '../pages/Account/EditProfilePage';
 import TransactionsPage from '../pages/Account/TransactionsPage';
 import PaymentChannelsPage from '../pages/Account/PaymentChannelsPage.jsx';
+import WithdrawalSettingsPage from '../pages/Account/WithdrawalSettingsPage.jsx'; // [新增] 引入新的設定頁面
 
 // 共用元件
 import BottomTabBar from '../components/BottomTabBar';
@@ -20,7 +20,6 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import AlertModal from '../components/AlertModal';
 
 const UserLayout = () => {
-    // 1. [核心修正] 從各自的 Context 取得所需的資料和函式
     const { isAdmin, alert, closeAlert, showAlert } = useAuthContext();
     const { 
         records,
@@ -29,7 +28,6 @@ const UserLayout = () => {
         handleAddAccount,
     } = useUserContext();
     
-    // 2. 管理此佈局層級的 UI 狀態
     const [currentPage, setCurrentPage] = useState('products');
     const [accountView, setAccountView] = useState('main');
     const [rechargeAmount, setRechargeAmount] = useState(0);
@@ -37,7 +35,6 @@ const UserLayout = () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
-    // 3. 定義 UI 事件處理函式
     const handleGenerateClick = useCallback((product) => {
         const pushLimit = product.pushLimit ?? appSettings?.copyPushLimit ?? 3;
         const todayStr = new Date().toLocaleDateString('sv-SE');
@@ -66,7 +63,7 @@ const UserLayout = () => {
         }
     }, [balance, showAlert, appSettings]);
 
-    // 4. 頁面渲染邏輯
+    // [修改] 頁面渲染邏輯
     const renderAccountPage = () => {
         switch (accountView) {
             case 'editProfile':
@@ -75,6 +72,8 @@ const UserLayout = () => {
                 return <TransactionsPage onBack={() => setAccountView('main')} />;
             case 'paymentChannels':
                 return <PaymentChannelsPage onBack={() => setAccountView('main')} amount={rechargeAmount} />;
+            case 'withdrawalSettings': // [新增] 增加一個新的 case
+                return <WithdrawalSettingsPage onBack={() => setAccountView('main')} />;
             case 'main':
             default:
                 return <AccountPage onNavigate={setAccountView} setRechargeAmount={setRechargeAmount} />;
@@ -98,7 +97,6 @@ const UserLayout = () => {
         }
     };
 
-    // 5. 回傳最終的 JSX 結構
     return (
         <div className="h-full flex flex-col">
             <main className="main-content flex-1 overflow-y-auto pb-[var(--tab-bar-height)]">
@@ -107,7 +105,7 @@ const UserLayout = () => {
             <button
                 onClick={() => setCurrentPage('account')}
                 className={`fixed top-4 right-4 z-30 flex items-center justify-center h-14 w-14 rounded-full bg-white shadow-lg transition-all duration-300 transform hover:scale-110 hover:shadow-xl ${currentPage === 'account' ? 'ring-4 ring-indigo-400' : 'ring-2 ring-gray-200'}`}
-                aria-label="我的帳戶"
+                aria-label="我的帳號"
             >
                 <i className="fas fa-user-circle text-3xl text-indigo-600"></i>
             </button>
@@ -145,4 +143,3 @@ const UserLayout = () => {
 };
 
 export default UserLayout;
-

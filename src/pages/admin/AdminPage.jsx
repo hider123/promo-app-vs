@@ -4,14 +4,16 @@ import ProductFormModal from '../../components/ProductFormModal.jsx';
 import AIScoutModal from '../../components/AIScoutModal.jsx';
 import SmartImage from '../../components/SmartImage.jsx';
 
-// 專為表格設計的倒數計時元件
+// [核心修正] 更新倒數計時元件，讓它直接接收「截止時間」(deadline)
 const CountdownCell = ({ deadline }) => {
     const calculateTimeLeft = (deadlineISOString) => {
         if (!deadlineISOString) return null;
         const targetDate = new Date(deadlineISOString).getTime();
         const now = new Date().getTime();
         const difference = targetDate - now;
+
         if (difference <= 0) return { expired: true };
+
         return {
             days: Math.floor(difference / (1000 * 60 * 60 * 24)),
             hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
@@ -41,7 +43,7 @@ const CountdownCell = ({ deadline }) => {
     );
 };
 
-// 專為表格設計的星級顯示元件
+// 一個專為表格設計的星級顯示元件
 const StarDisplay = ({ count }) => (
     <div className="flex items-center">
         {[...Array(5)].map((_, i) => (
@@ -50,7 +52,7 @@ const StarDisplay = ({ count }) => (
     </div>
 );
 
-// 格式化時間的輔助函式
+// 一個格式化時間的輔助函式
 const formatTime = (isoString) => {
     if (!isoString) return '-';
     try {
@@ -159,7 +161,6 @@ const AdminPage = () => {
                                 <th scope="col" className="px-6 py-3">價格</th>
                                 <th scope="col" className="px-6 py-3">熱門指數</th>
                                 <th scope="col" className="px-6 py-3">創建時間</th>
-                                {/* [核心修正] 新增欄位標題 */}
                                 <th scope="col" className="px-6 py-3">佣金範圍</th>
                                 <th scope="col" className="px-6 py-3">截止時間</th>
                                 <th scope="col" className="px-6 py-3">狀態</th>
@@ -179,11 +180,9 @@ const AdminPage = () => {
                                         <td className="px-6 py-4">{product.price}</td>
                                         <td className="px-6 py-4"><StarDisplay count={product.popularity} /></td>
                                         <td className="px-6 py-4 text-xs text-gray-500 whitespace-pre">{formatTime(product.createdAt).replace(' ', '\n')}</td>
-                                        {/* [核心修正] 顯示佣金範圍 */}
                                         <td className="px-6 py-4 text-sm text-gray-600 font-mono">
                                             {`$${(product.commissionMin || 0).toFixed(2)} - $${(product.commissionMax || 0).toFixed(2)}`}
                                         </td>
-                                        {/* [核心修正] 顯示截止時間 */}
                                         <td className="px-6 py-4">
                                             <CountdownCell deadline={product.deadline} />
                                         </td>

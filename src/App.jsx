@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuthContext } from './context/AuthContext.jsx';
 import { UserProvider } from './context/UserContext.jsx';
 import { AdminProvider } from './context/AdminContext.jsx';
+// [修正] 引入正確的 Layout 元件
 import UserLayout from './layouts/UserLayout.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
 import StyleInjector from './components/StyleInjector';
@@ -59,6 +60,7 @@ const AppContent = () => {
             // 如果登入者是管理員
             if (isAdminRoute) {
                 // 且在後台路由 -> 顯示後台 (被 AdminProvider 包裹)
+                // [修正] 使用 AdminLayout 而不是 AppLayout
                 return <AdminProvider><AdminLayout /></AdminProvider>;
             } else {
                 // 雖然是管理員，但在前台路由 -> 顯示前台 (被 UserProvider 包裹)
@@ -95,4 +97,3 @@ export default function App() {
         </AuthProvider>
     );
 }
-

@@ -11,19 +11,32 @@ C:\USERS\JIWEI\DOCUMENTS\VS\PROMO-APP\SRC
 ©¦      react.svg
 ©¦      
 ©À©¤components
-©¦      AlertModal.jsx
-©¦      BottomTabBar.jsx
-©¦      ConfirmationModal.jsx
-©¦      GenerationModal.jsx
-©¦      InviteMemberModal.jsx
-©¦      ProductCard.jsx
-©¦      RechargeModal.jsx
-©¦      RecordsPage.jsx
-©¦      SearchBar.jsx
-©¦      StyleInjector.jsx
-©¦      
+©¦  ©¦  AIAssistantService.js
+©¦  ©¦  AIScoutModal.jsx
+©¦  ©¦  AlertModal.jsx
+©¦  ©¦  BottomTabBar.jsx
+©¦  ©¦  ConfirmationModal.jsx
+©¦  ©¦  GenerationModal.jsx
+©¦  ©¦  InviteMemberModal.jsx
+©¦  ©¦  ProductCard.jsx
+©¦  ©¦  ProductFormModal.jsx
+©¦  ©¦  QRCodeUpload.jsx
+©¦  ©¦  RechargeModal.jsx
+©¦  ©¦  SearchBar.jsx
+©¦  ©¦  SmartImage.jsx
+©¦  ©¦  StyleInjector.jsx
+©¦  ©¦  WithdrawModal.jsx
+©¦  ©¦  
+©¦  ©¸©¤form
+©¦          ImageUpload.jsx
+©¦          ProductDetailsForm.jsx
+©¦          StarInput.jsx
+©¦          useProductForm.js
+©¦          
 ©À©¤context
-©¦      DataContext.jsx
+©¦      AdminContext.jsx
+©¦      AuthContext.jsx
+©¦      UserContext.jsx
 ©¦      
 ©À©¤data
 ©¦      mockData.js
@@ -31,9 +44,16 @@ C:\USERS\JIWEI\DOCUMENTS\VS\PROMO-APP\SRC
 ©À©¤firebase
 ©¦      config.js
 ©¦      
+©À©¤functions
+©¦      index.js
+©¦      
 ©À©¤hooks
 ©¦      useAuth.js
 ©¦      useFirestoreListeners.js
+©¦      
+©À©¤layouts
+©¦      AdminLayout.jsx
+©¦      UserLayout.jsx
 ©¦      
 ©¸©¤pages
     ©¦  AuthPage.jsx
@@ -42,8 +62,20 @@ C:\USERS\JIWEI\DOCUMENTS\VS\PROMO-APP\SRC
     ©¦  RecordsPage.jsx
     ©¦  TeamPage.jsx
     ©¦  
-    ©¸©¤Account
-            AccountPage.jsx
-            EditProfilePage.jsx
-            TransactionsPage.jsx
+    ©À©¤Account
+    ©¦      AccountPage.jsx
+    ©¦      EditProfilePage.jsx
+    ©¦      PaymentChannelsPage.jsx
+    ©¦      TransactionsPage.jsx
+    ©¦      WithdrawalSettingsPage.jsx
+    ©¦      
+    ©¸©¤admin
+            AdminDashboard.jsx
+            AdminLoginPage.jsx
+            AdminPage.jsx
+            ProductManagementPanel.jsx
+            RechargeSettingsPage.jsx
+            SettingsPage.jsx
+            UsersPage.jsx
+            WithdrawalsPage.jsx
             

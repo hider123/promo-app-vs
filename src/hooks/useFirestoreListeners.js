@@ -7,26 +7,18 @@ import {
     initialRecordsData
 } from '../data/mockData';
 
-/**
- * Custom Hook: 專門處理 Firestore 資料的即時監聽。
- * @param {string} scope - 監聽的範圍，'user' 或 'admin'。
- * @param {string} appId - 應用程式 ID。
- * @param {string} userId - 使用者 ID。
- * @param {boolean} isReadyToListen - 是否可以開始監聽。
- * @param {Function} onInitialLoadComplete - 所有監聽器首次載入完成時的回呼函式。
- * @returns {object} 一個包含所有即時資料狀態的物件。
- */
 export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onInitialLoadComplete) => {
-    // 1. 為每個資料集合建立對應的 state
     const [appSettings, setAppSettings] = useState(null);
     const [products, setProducts] = useState([]);
     const [poolAccounts, setPoolAccounts] = useState([]);
     const [teamMembers, setTeamMembers] = useState([]);
     const [pendingInvitations, setPendingInvitations] = useState([]);
     const [records, setRecords] = useState([]);
-    const [allUsers, setAllUsers] = useState([]);
+    const [paymentInfo, setPaymentInfo] = useState(null);
+    const [allTeamMembers, setAllTeamMembers] = useState([]);
+    const [allPoolAccounts, setAllPoolAccounts] = useState([]);
+    const [allUserRecords, setAllUserRecords] = useState([]);
 
-    // 2. 使用 useEffect 來處理副作用（設定監聽器）
     useEffect(() => {
         if (!isReadyToListen) {
             return () => {};
@@ -42,21 +34,44 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
                 scope: ['user', 'admin'],
                 queryConstraints: scope === 'user' ? [where('status', '==', 'published')] : []
             },
-            { name: 'team_members', setter: setTeamMembers, initialData: initialTeamMembersData, isPublic: true, scope: ['user'], seedOnEmpty: true },
+            { name: 'team_members', setter: scope === 'admin' ? setAllTeamMembers : setTeamMembers, initialData: initialTeamMembersData, isPublic: true, scope: ['user', 'admin'], seedOnEmpty: true },
             { name: 'team_invitations', setter: setPendingInvitations, initialData: [], isPublic: true, scope: ['user'], seedOnEmpty: true },
             
             // --- 私人資料 (Private Data) ---
             { name: 'poolAccounts', setter: setPoolAccounts, initialData: initialPoolAccountsData, isPublic: false, scope: ['user'], seedOnEmpty: true },
             { name: 'records', setter: setRecords, initialData: initialRecordsData, isPublic: false, scope: ['user'], seedOnEmpty: true },
-
-            // --- 管理員資料 (僅限 'admin' scope) ---
             { 
-                name: 'users', 
-                setter: setAllUsers, 
-                isPublic: true, // 'users' 集合通常是公開讀取的，但寫入受限
+                name: 'private', 
+                setter: setPaymentInfo, 
+                // [修改] 根據新的需求，更新預設資料結構
+                initialData: [{ 
+                    id: 'payment_info', 
+                    alipay: { account: '', qrCodeUrl: '' }, 
+                    wechat: { account: '', qrCodeUrl: '' }, 
+                    bankcard: { number: '', name: '', bankName: '' } 
+                }],
+                isPublic: false, 
+                scope: ['user'], 
+                isSingleDoc: true, 
+                docId: 'payment_info', 
+                seedOnEmpty: true 
+            },
+
+            // --- 集合群組 (僅限 'admin' scope) ---
+            { 
+                name: 'poolAccounts', 
+                setter: setAllPoolAccounts, 
+                isPublic: false, 
                 scope: ['admin'], 
-                isCollectionGroup: false, // 這是一個頂層集合，不是集合組
-                queryConstraints: [] // 初始獲取所有用戶，不做篩選
+                isCollectionGroup: true,
+            },
+            { 
+                name: 'records', 
+                setter: setAllUserRecords, 
+                isPublic: false, 
+                scope: ['admin'], 
+                isCollectionGroup: true,
+                queryConstraints: [where('type', '==', 'commission')]
             },
         ];
         
@@ -71,7 +86,5 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
         };
     }, [scope, isReadyToListen, userId, appId, onInitialLoadComplete]);
 
-    // 3. 回傳所有資料狀態
-    return { appSettings, products, poolAccounts, teamMembers, pendingInvitations, records, allUsers };
+    return { appSettings, products, poolAccounts, teamMembers, pendingInvitations, records, paymentInfo, allUserRecords, allTeamMembers, allPoolAccounts };
 };
-

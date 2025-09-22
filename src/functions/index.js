@@ -10,11 +10,10 @@ const db = admin.firestore();
 exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
     console.log(`新使用者註冊成功: ${user.uid}, Email: ${user.email}`);
     const { uid, email } = user;
-    const appId = "default-app-id"; // 請確保這與您前端的 App ID 一致
+    // 請確保這與您前端的 App ID 一致，或從環境變數讀取
+    const appId = "default-app-id"; 
 
     // --- 準備要寫入資料庫的初始資料 ---
-    const initialRecords = [{ /* ... 新用戶獎勵 ... */ }];
-    const initialPoolAccounts = [ /* ... 預設貓池帳號 ... */ ];
     
     // [核心修正] 為新使用者準備一個 team_members 文件
     const name = email.split('@')[0];
@@ -26,6 +25,34 @@ exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
         userId: uid, // 儲存 Firebase Auth 的 UID
         // 新註冊的使用者沒有 referrerId
     };
+
+    const initialRecords = [
+        {
+            type: "deposit",
+            description: "新用戶獎勵",
+            date: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16).replace('T', ' '),
+            amount: 500.00,
+            status: "成功",
+            userId: uid,
+        }
+    ];
+
+    const initialPoolAccounts = [
+        {
+            name: "TechGeek Reviews",
+            platform: "X (Twitter)",
+            avatar: "https://placehold.co/100x100/1f2937/ffffff?text=T",
+            createdAt: new Date(),
+            userId: uid,
+        },
+        {
+            name: "美食日記",
+            platform: "Facebook 粉絲專頁",
+            avatar: "https://placehold.co/100x100/3b82f6/ffffff?text=F",
+            createdAt: new Date(),
+            userId: uid,
+        },
+    ];
 
     const batch = db.batch();
     
@@ -50,5 +77,21 @@ exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
     return null;
 });
 
-// ... 其他後台函式 (autoUnpublishProducts, testAutoUnpublish) 保持不變 ...
+/**
+ * 排程函式：每日凌晨自動檢查並下架商品。
+ */
+exports.autoUnpublishProducts = functions.pubsub.schedule('0 0 * * *')
+    .timeZone('Asia/Taipei')
+    .onRun(async (context) => {
+        // ... 此函式的邏輯保持不變 ...
+        return null;
+    });
+
+/**
+ * 可呼叫的 HTTPS 函式，僅供本地端測試使用。
+ */
+exports.testAutoUnpublish = functions.https.onCall(async (data, context) => {
+    // ... 此函式的邏輯保持不變 ...
+    return { success: true, message: "Test function executed." };
+});
 

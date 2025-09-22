@@ -2,23 +2,23 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useUserContext } from '../../context/UserContext.jsx';
 import { useAuthContext } from '../../context/AuthContext.jsx';
 import RechargeModal from '../../components/RechargeModal.jsx';
+import WithdrawModal from '../../components/WithdrawModal.jsx';
 
 const AccountPage = ({ onNavigate, setRechargeAmount }) => {
-    // 1. 從 Context 取得所需的資料和函式
-    const { handleSignOut, userId } = useAuthContext();
-    const { records, showAlert, appSettings } = useUserContext();
+    // 1. 從 AuthContext 取得 user 和 userId
+    const { handleSignOut, user, userId, showAlert } = useAuthContext();
+    const { records, appSettings, handleWithdrawRequest, paymentInfo } = useUserContext();
     
-    // 2. 管理此頁面自身的 UI 狀態
     const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
-    // [核心修正] 新增 state 來管理社群帳號的連結狀態
+    const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+    
     const [linkedAccounts, setLinkedAccounts] = useState({
         facebook: true,
         twitter: true,
         instagram: false,
-        tiktok: false, // 新增 TikTok 的初始狀態
+        tiktok: false,
     });
 
-    // 3. 計算衍生資料 (Derived Data)
     const totalBalance = (records || []).reduce((sum, r) => sum + (r.amount || 0), 0);
     const catPoolPurchaseCount = useMemo(() => 
         (records || []).filter(r => r.type === 'expense' && r.description.startsWith('費用: 購買貓池帳號')).length,
@@ -26,7 +26,6 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
     const pendingCommission = 5.00;
     const withdrawableBalance = totalBalance > pendingCommission ? totalBalance - pendingCommission : 0;
 
-    // 4. 定義輔助函式 (Helper Functions)
     const getUserLevel = (purchaseCount) => {
         const highTier = appSettings?.highTierThreshold ?? 100;
         const midTier = appSettings?.midTierThreshold ?? 20;
@@ -37,26 +36,21 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
     };
     const userLevel = getUserLevel(catPoolPurchaseCount);
     
-    // 5. 定義事件處理函式 (Event Handlers)
     const handleConfirmRecharge = (amount) => {
         setIsRechargeModalOpen(false);
         setRechargeAmount(amount);
         onNavigate('paymentChannels');
     };
     
-    // [核心修正] 新增一個函式來處理連結/取消連結的邏輯
+    const handleConfirmWithdraw = async (data) => {
+        await handleWithdrawRequest(data);
+        setIsWithdrawModalOpen(false);
+    };
+    
     const handleToggleLink = (platform, platformName) => {
         const isCurrentlyLinked = linkedAccounts[platform];
-        // 在這裡可以加入呼叫後端 API 的邏輯
         console.log(`正在 ${isCurrentlyLinked ? '取消連結' : '連結'} ${platformName}...`);
-        
-        // 更新前端的 UI 狀態
-        setLinkedAccounts(prev => ({
-            ...prev,
-            [platform]: !isCurrentlyLinked
-        }));
-
-        // 顯示成功提示
+        setLinkedAccounts(prev => ({ ...prev, [platform]: !isCurrentlyLinked }));
         showAlert(`🎉 ${platformName} 帳號${isCurrentlyLinked ? '已取消連結' : '連結成功'}！`);
     };
 
@@ -64,11 +58,9 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
         { key: 'facebook', name: 'Facebook', icon: 'fab fa-facebook text-3xl text-blue-600 mr-5 w-8 text-center' },
         { key: 'twitter', name: 'X (Twitter)', icon: 'fab fa-twitter text-3xl text-gray-800 mr-5 w-8 text-center' },
         { key: 'instagram', name: 'Instagram', icon: 'fab fa-instagram text-3xl text-pink-500 mr-5 w-8 text-center' },
-        // [核心修正] 新增 TikTok 到平台列表
         { key: 'tiktok', name: 'TikTok', icon: 'fab fa-tiktok text-3xl text-black mr-5 w-8 text-center' }
     ];
 
-    // 6. 回傳 JSX 結構來渲染 UI
     return (
         <>
             <div className="space-y-8 p-4">
@@ -76,13 +68,16 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                 
                 <div className="bg-white p-5 rounded-xl shadow-sm relative">
                     <h2 className="text-2xl font-bold text-gray-800 mb-5">個人資料</h2>
-                    <div className="flex items-center space-x-5">
-                        <img className="h-20 w-20 rounded-full object-cover" src="https://placehold.co/100x100/e2e8f0/475569?text=頭像" alt="使用者頭像" />
+                    {/* [修改] 根據您的需求更新此區塊 */}
+                    <div className="flex items-center justify-between">
+                        {/* 左側：帳號與 UID */}
                         <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-x-3 mb-1.5">
-                                <p className="font-bold text-2xl text-gray-900">PromoMaster</p>
-                                <span className={`${userLevel.color} text-sm font-semibold px-3 py-1 rounded-full`}>{userLevel.name}</span>
-                            </div>
+                            <p className="font-bold text-2xl text-gray-900 truncate" title={user?.email}>{user?.email || '載入中...'}</p>
+                            <p className="text-sm text-gray-500 mt-1 truncate" title={userId}>UID: {userId || '...'}</p>
+                        </div>
+                        {/* 右側：階級名稱 */}
+                        <div className="flex-shrink-0 ml-4">
+                             <span className={`${userLevel.color} text-sm font-semibold px-3 py-1 rounded-full`}>{userLevel.name}</span>
                         </div>
                     </div>
                     <button onClick={() => onNavigate('editProfile')} className="absolute top-5 right-5 text-lg font-bold text-indigo-600 hover:text-indigo-800 flex-shrink-0">編輯</button>
@@ -102,8 +97,26 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                         <div className="px-5">待處理: <span className="font-bold">US$ {pendingCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                     </div>
                     <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8">
-                        <button className="w-full max-w-xs py-3 rounded-lg font-bold transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300 text-xl">申請提領</button>
+                        <button 
+                            onClick={() => setIsWithdrawModalOpen(true)}
+                            className="w-full max-w-xs py-3 rounded-lg font-bold transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300 text-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={withdrawableBalance <= 0}
+                        >
+                            申請提領
+                        </button>
                         <button onClick={() => setIsRechargeModalOpen(true)} className="w-full max-w-xs py-3 rounded-lg font-bold transition-colors bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 text-xl">儲值</button>
+                    </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl shadow-sm">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-800">收款方式設定</h2>
+                            <p className="text-gray-500 mt-1">管理您的提領帳戶，確保資金能準確到帳。</p>
+                        </div>
+                        <button onClick={() => onNavigate('withdrawalSettings')} className="text-lg font-bold text-indigo-600 hover:text-indigo-800 flex-shrink-0">
+                            前往設定 <i className="fas fa-arrow-right ml-1"></i>
+                        </button>
                     </div>
                 </div>
                 
@@ -148,9 +161,17 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                 onClose={() => setIsRechargeModalOpen(false)}
                 onConfirm={handleConfirmRecharge}
             />
+            
+            <WithdrawModal
+                isOpen={isWithdrawModalOpen}
+                onClose={() => setIsWithdrawModalOpen(false)}
+                onConfirm={handleConfirmWithdraw}
+                withdrawableBalance={withdrawableBalance}
+                appSettings={appSettings}
+                paymentInfo={paymentInfo} 
+            />
         </>
     );
 };
 
 export default AccountPage;
-

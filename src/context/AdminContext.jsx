@@ -8,7 +8,8 @@ export const useAdminContext = () => useContext(AdminContext);
 
 export const AdminProvider = ({ children }) => {
     const { appId, user, showAlert } = useAuthContext();
-    const { products, appSettings, allUsers } = useFirestoreListeners('admin', appId, user?.uid, !!user, useCallback(() => {}, []));
+    // [修正] 直接使用從 Hook 傳來的正確變數名稱
+    const { products, appSettings, allUserRecords, allTeamMembers, allPoolAccounts } = useFirestoreListeners('admin', appId, user?.uid, !!user, useCallback(() => {}, []));
 
     const handleUpdateSettings = async (newSettings) => {
         if (!appId) return;
@@ -26,14 +27,12 @@ export const AdminProvider = ({ children }) => {
         await handleAddMultipleProducts([productData]);
     };
 
-    // [核心修正] 建立一個新的函式來處理批次新增
     const handleAddMultipleProducts = async (productsToAdd) => {
         if (!appId || !productsToAdd || productsToAdd.length === 0) return;
         
         showAlert(`正在處理 ${productsToAdd.length} 件商品...`);
 
         try {
-            // 使用 Promise.all 來並行處理所有商品的圖片上傳和資料準備
             const newProductsPromises = productsToAdd.map(async (productData) => {
                 let finalImageUrl = productData.image_url || productData.image;
 
@@ -64,7 +63,6 @@ export const AdminProvider = ({ children }) => {
             
             const newProducts = await Promise.all(newProductsPromises);
 
-            // 一次性將所有準備好的商品寫入資料庫
             for (const newProduct of newProducts) {
                 await addData(`artifacts/${appId}/public/data/products`, newProduct);
             }
@@ -113,7 +111,9 @@ export const AdminProvider = ({ children }) => {
     const value = {
         products,
         appSettings,
-        allUsers,
+        allUserRecords,
+        allTeamMembers,
+        allPoolAccounts,
         handleAddProduct,
         handleAddMultipleProducts,
         handleUpdateProduct,
@@ -124,4 +124,3 @@ export const AdminProvider = ({ children }) => {
 
     return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
 };
-

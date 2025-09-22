@@ -1,32 +1,25 @@
 import React, { createContext, useContext, useMemo, useCallback, useState } from 'react';
 import { useAuthContext } from './AuthContext.jsx';
 import { useFirestoreListeners } from '../hooks/useFirestoreListeners.js';
-import { addData, deleteDataByRef, updateData } from '../firebase/config';
+import { addData, deleteDataByRef, updateData, setData } from '../firebase/config';
 
-// 1. 建立 Context 物件
 const UserContext = createContext();
 
-// 2. 建立一個自定義 Hook (useUserContext)，方便前台元件存取
 export const useUserContext = () => useContext(UserContext);
 
-// 3. 建立 Provider 元件 (UserProvider)
 export const UserProvider = ({ children }) => {
-    // a. 從 AuthContext 取得使用者資訊和全域功能
     const { user, userId, appId, showAlert } = useAuthContext();
     
-    // b. 監聽所有「使用者專屬」和「公開」的資料集合
-    const { products, poolAccounts, teamMembers, pendingInvitations, records, appSettings } = useFirestoreListeners(
+    const { products, poolAccounts, teamMembers, pendingInvitations, records, appSettings, paymentInfo } = useFirestoreListeners(
         'user',
         appId,
         userId,
-        !!user, // 只有在 user 物件存在時，才開始監聽
+        !!user,
         useCallback(() => {}, [])
     );
 
-    // c. 計算衍生狀態 (從原始資料計算出的新資料)
     const balance = useMemo(() => (records || []).reduce((acc, record) => acc + (record.amount || 0), 0), [records]);
     
-    // d. 封裝所有「使用者專屬」的業務邏輯
     const handleRecharge = async (amount) => {
         if (!userId || !appId || !amount || amount <= 0) return;
         const newRecord = {
@@ -128,8 +121,44 @@ export const UserProvider = ({ children }) => {
             showAlert('錯誤：在團隊中找不到您的資料。');
         }
     };
+
+    const handleWithdrawRequest = async ({ amount, paymentInfo }) => {
+        if (!userId || !appId || !amount || amount <= 0 || !paymentInfo) {
+            showAlert("提領申請資料不完整。");
+            return;
+        }
+
+        const newRequest = {
+            userId: userId,
+            amount: amount,
+            paymentInfo: paymentInfo,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+        };
+
+        try {
+            await addData(`artifacts/${appId}/public/data/withdrawal_requests`, newRequest);
+            showAlert('✅ 提領申請已成功送出！\n我們將在 24 小時內完成審核。');
+        } catch (error) {
+            console.error("送出提領申請失敗:", error);
+            showAlert("送出申請失敗，請稍後再試。");
+        }
+    };
+
+    const handleUpdatePaymentInfo = async (newPaymentInfo) => {
+        if (!userId || !appId) {
+            showAlert("無法儲存設定，請重新登入。");
+            return;
+        }
+        try {
+            await setData(`artifacts/${appId}/users/${userId}/private`, 'payment_info', newPaymentInfo, { merge: true });
+            showAlert('✅ 收款方式已成功儲存！');
+        } catch (error) {
+            console.error("更新收款方式失敗:", error);
+            showAlert('儲存失敗，請稍後再試。');
+        }
+    };
     
-    // e. 組合所有要提供給前台子元件的 value
     const value = {
         products,
         appSettings,
@@ -138,14 +167,14 @@ export const UserProvider = ({ children }) => {
         pendingInvitations,
         records,
         balance,
-        // showAlert 和 closeAlert 由 AuthContext 提供，這裡不再重複提供
+        paymentInfo,
         handleRecharge,
         handleAddAccount,
         handleInvite,
         updateUserProfile,
+        handleWithdrawRequest,
+        handleUpdatePaymentInfo,
     };
 
-    // f. 透過 Provider 將 value 廣播出去
     return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 };
-
