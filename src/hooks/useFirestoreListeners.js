@@ -8,17 +8,16 @@ import {
 } from '../data/mockData';
 
 export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onInitialLoadComplete) => {
+    // 1. 為每個資料集合建立對應的 state
     const [appSettings, setAppSettings] = useState(null);
     const [products, setProducts] = useState([]);
     const [poolAccounts, setPoolAccounts] = useState([]);
     const [teamMembers, setTeamMembers] = useState([]);
     const [pendingInvitations, setPendingInvitations] = useState([]);
     const [records, setRecords] = useState([]);
-    const [paymentInfo, setPaymentInfo] = useState(null);
-    const [allTeamMembers, setAllTeamMembers] = useState([]);
-    const [allPoolAccounts, setAllPoolAccounts] = useState([]);
-    const [allUserRecords, setAllUserRecords] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
 
+    // 2. 使用 useEffect 來處理副作用（設定監聽器）
     useEffect(() => {
         if (!isReadyToListen) {
             return () => {};
@@ -34,44 +33,21 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
                 scope: ['user', 'admin'],
                 queryConstraints: scope === 'user' ? [where('status', '==', 'published')] : []
             },
-            { name: 'team_members', setter: scope === 'admin' ? setAllTeamMembers : setTeamMembers, initialData: initialTeamMembersData, isPublic: true, scope: ['user', 'admin'], seedOnEmpty: true },
+            { name: 'team_members', setter: setTeamMembers, initialData: initialTeamMembersData, isPublic: true, scope: ['user'], seedOnEmpty: true },
             { name: 'team_invitations', setter: setPendingInvitations, initialData: [], isPublic: true, scope: ['user'], seedOnEmpty: true },
             
             // --- 私人資料 (Private Data) ---
             { name: 'poolAccounts', setter: setPoolAccounts, initialData: initialPoolAccountsData, isPublic: false, scope: ['user'], seedOnEmpty: true },
             { name: 'records', setter: setRecords, initialData: initialRecordsData, isPublic: false, scope: ['user'], seedOnEmpty: true },
-            { 
-                name: 'private', 
-                setter: setPaymentInfo, 
-                // [修改] 根據新的需求，更新預設資料結構
-                initialData: [{ 
-                    id: 'payment_info', 
-                    alipay: { account: '', qrCodeUrl: '' }, 
-                    wechat: { account: '', qrCodeUrl: '' }, 
-                    bankcard: { number: '', name: '', bankName: '' } 
-                }],
-                isPublic: false, 
-                scope: ['user'], 
-                isSingleDoc: true, 
-                docId: 'payment_info', 
-                seedOnEmpty: true 
-            },
 
-            // --- 集合群組 (僅限 'admin' scope) ---
+            // --- 管理員資料 (僅限 'admin' scope) ---
             { 
-                name: 'poolAccounts', 
-                setter: setAllPoolAccounts, 
-                isPublic: false, 
+                name: 'users', 
+                setter: setAllUsers, 
+                isPublic: true, // 'users' 集合是公開的
                 scope: ['admin'], 
-                isCollectionGroup: true,
-            },
-            { 
-                name: 'records', 
-                setter: setAllUserRecords, 
-                isPublic: false, 
-                scope: ['admin'], 
-                isCollectionGroup: true,
-                queryConstraints: [where('type', '==', 'commission')]
+                isCollectionGroup: false, // 這是一個頂層集合
+                queryConstraints: [] // 獲取所有用戶
             },
         ];
         
@@ -86,5 +62,6 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
         };
     }, [scope, isReadyToListen, userId, appId, onInitialLoadComplete]);
 
-    return { appSettings, products, poolAccounts, teamMembers, pendingInvitations, records, paymentInfo, allUserRecords, allTeamMembers, allPoolAccounts };
+    // 3. 回傳所有資料狀態
+    return { appSettings, products, poolAccounts, teamMembers, pendingInvitations, records, allUsers };
 };

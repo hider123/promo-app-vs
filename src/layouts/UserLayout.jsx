@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useUserContext } from '../context/UserContext.jsx';
 import { useAuthContext } from '../context/AuthContext.jsx';
 
@@ -17,13 +17,13 @@ import WithdrawalSettingsPage from '../pages/Account/WithdrawalSettingsPage.jsx'
 import BottomTabBar from '../components/BottomTabBar';
 import GenerationModal from '../components/GenerationModal';
 import ConfirmationModal from '../components/ConfirmationModal';
-// [還原] 在此處重新引入 AlertModal
 import AlertModal from '../components/AlertModal';
 
 const UserLayout = () => {
-    // [還原] 從 Context 中重新取回 alert 和 closeAlert
-    const { isAdmin, alert, closeAlert, showAlert } = useAuthContext();
+    const { userId, isAdmin, alert, closeAlert, showAlert } = useAuthContext();
     const { 
+        teamMembers,
+        updateUserProfile,
         records,
         balance,
         appSettings,
@@ -36,6 +36,29 @@ const UserLayout = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+
+    // [核心修正] 調整綁定與清除推薦人 ID 的邏輯
+    useEffect(() => {
+        const referrerId = sessionStorage.getItem('referrerId');
+        
+        // 只有在確定所有需要的資料都準備好時，才進行操作
+        if (referrerId && userId && teamMembers) {
+            const currentUserInTeam = teamMembers.find(member => member.userId === userId);
+            
+            // 確保使用者資料已存在，且尚未被設定過推薦人
+            if (currentUserInTeam && !currentUserInTeam.referrerId) {
+                console.log(`正在為使用者 ${userId} 綁定推薦人: ${referrerId}`);
+                updateUserProfile({ referrerId: referrerId });
+                
+                // 只有在確認已呼叫更新後，才清除 sessionStorage
+                sessionStorage.removeItem('referrerId');
+            } else if (currentUserInTeam && currentUserInTeam.referrerId) {
+                // 如果已經有推薦人了，也清除 sessionStorage，避免重複執行
+                sessionStorage.removeItem('referrerId');
+            }
+        }
+    }, [userId, teamMembers, updateUserProfile]);
+
 
     const handleGenerateClick = useCallback((product) => {
         const pushLimit = product.pushLimit ?? appSettings?.copyPushLimit ?? 3;
@@ -105,7 +128,7 @@ const UserLayout = () => {
             </main>
             <button
                 onClick={() => setCurrentPage('account')}
-                className={`fixed top-4 right-4 z-30 flex items-center justify-center h-14 w-14 rounded-full bg-white shadow-lg transition-all duration-300 transform hover:scale-110 hover:shadow-xl ${currentPage === 'account' ? 'ring-4 ring-indigo-400' : 'ring-2 ring-gray-200'}`}
+                className={`fixed top-4 right-4 z-30 flex items-center justify-center h-14 w-14 rounded-full bg-white shadow-lg transition-all duration-300 transform hover-scale-110 hover:shadow-xl ${currentPage === 'account' ? 'ring-4 ring-indigo-400' : 'ring-2 ring-gray-200'}`}
                 aria-label="我的帳戶"
             >
                 <i className="fas fa-user-circle text-3xl text-indigo-600"></i>
@@ -134,7 +157,6 @@ const UserLayout = () => {
                 <p>每次新增帳號將從您的餘額中扣除 US${(appSettings?.catPoolPrice || 5.00).toFixed(2)} 的費用。</p>
                 <p className="mt-2 font-semibold">您確定要繼續嗎？</p>
             </ConfirmationModal>
-            {/* [還原] 在此處重新渲染 AlertModal */}
             <AlertModal 
                 isOpen={alert.isOpen}
                 onClose={closeAlert}

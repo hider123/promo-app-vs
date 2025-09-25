@@ -16,10 +16,7 @@
         "firebase-debug.log",
         "firebase-debug.*.log"
       ],
-      "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" install"
-      ],
-      "runtime": "nodejs18"
+      "runtime": "nodejs20"
     }
   ],
   "emulators": {

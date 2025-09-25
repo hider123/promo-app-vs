@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useMemo, useCallback, useState } from 'react';
 import { useAuthContext } from './AuthContext.jsx';
 import { useFirestoreListeners } from '../hooks/useFirestoreListeners.js';
-import { addData, deleteDataByRef, updateData, setData } from '../firebase/config';
+import { setData, addData, deleteDataByRef, updateData } from '../firebase/config';
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 const UserContext = createContext();
 
@@ -9,15 +10,7 @@ export const useUserContext = () => useContext(UserContext);
 
 export const UserProvider = ({ children }) => {
     const { user, userId, appId, showAlert } = useAuthContext();
-    
-    const { products, poolAccounts, teamMembers, pendingInvitations, records, appSettings, paymentInfo } = useFirestoreListeners(
-        'user',
-        appId,
-        userId,
-        !!user,
-        useCallback(() => {}, [])
-    );
-
+    const { products, poolAccounts, teamMembers, pendingInvitations, records, appSettings, paymentInfo } = useFirestoreListeners('user', appId, userId, !!user, useCallback(() => {}, []));
     const balance = useMemo(() => (records || []).reduce((acc, record) => acc + (record.amount || 0), 0), [records]);
     
     const handleRecharge = async (amount) => {
@@ -40,38 +33,21 @@ export const UserProvider = ({ children }) => {
     };
 
     const handleAddAccount = async () => {
-        if (!userId || !appId || !appSettings) return;
+        if (!userId || !appId) return;
 
-        const catPoolPrice = appSettings.catPoolPrice || 5.00;
+        showAlert('正在為您建立新帳號，請稍候...');
 
-        const namePrefixes = ['Creative', 'Digital', 'Awesome', 'Super', 'Pro', 'Global'];
-        const nameSuffixes = ['Creator', 'Mind', 'Guru', 'World', 'Expert', 'Hub'];
-        const platforms = ['Instagram', 'TikTok', 'YouTube', 'Facebook 粉絲專頁', 'X (Twitter)'];
-        
-        const newAccountData = {
-            name: `${namePrefixes[Math.floor(Math.random() * namePrefixes.length)]}${nameSuffixes[Math.floor(Math.random() * nameSuffixes.length)]}${Math.floor(Math.random() * 100)}`,
-            platform: platforms[Math.floor(Math.random() * platforms.length)],
-            avatar: `https://placehold.co/100x100/ede9fe/5b21b6?text=新`,
-            createdAt: new Date(),
-            userId: userId,
-        };
-
-        const newExpenseRecord = {
-            type: 'expense',
-            description: `費用: 購買貓池帳號 (${newAccountData.name})`,
-            date: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16).replace('T', ' '),
-            amount: -catPoolPrice,
-            status: '成功',
-            userId: userId,
-        };
-        
         try {
-            await addData(`artifacts/${appId}/users/${userId}/poolAccounts`, newAccountData);
-            await addData(`artifacts/${appId}/users/${userId}/records`, newExpenseRecord);
-            showAlert(`帳號 ${newAccountData.name} 已經建立！`);
+            const functions = getFunctions();
+            const createAccountFunction = httpsCallable(functions, 'createUniquePoolAccount');
+            
+            const result = await createAccountFunction();
+
+            showAlert(result.data.message || '帳號已成功建立！');
+
         } catch (error) {
              console.error("購買貓池帳號失敗: ", error);
-             showAlert('購買失敗，請稍後再試。');
+             showAlert(`購買失敗：${error.message}`);
         }
     };
     
@@ -106,19 +82,28 @@ export const UserProvider = ({ children }) => {
         const currentUserInTeam = (teamMembers || []).find(member => member.userId === userId);
         if (currentUserInTeam) {
             try {
-                const dataToUpdate = {
-                    name: profileData.username,
-                    referrerId: profileData.referrerId,
-                    phone: profileData.phone,
-                };
-                await updateData(`artifacts/${appId}/public/data/team_members`, currentUserInTeam.id, dataToUpdate);
-                showAlert('個人資料已成功儲存！');
+                // 過濾掉值為 undefined 的欄位，避免意外覆蓋
+                const dataToUpdate = Object.entries(profileData).reduce((acc, [key, value]) => {
+                    if (value !== undefined) {
+                        acc[key] = value;
+                    }
+                    return acc;
+                }, {});
+
+                if (Object.keys(dataToUpdate).length > 0) {
+                    await updateData(`artifacts/${appId}/public/data/team_members`, currentUserInTeam.id, dataToUpdate);
+                    // 只有在不是僅更新推薦人ID時才顯示通用成功訊息
+                    if (!('referrerId' in dataToUpdate && Object.keys(dataToUpdate).length === 1)) {
+                         showAlert('✅ 個人資料已成功儲存！');
+                    }
+                }
             } catch (error) {
                 console.error("更新個人資料失敗:", error);
                 showAlert('儲存失敗，請稍後再試。');
             }
         } else {
-            showAlert('錯誤：在團隊中找不到您的資料。');
+             // 首次登入時，teamMembers 可能尚未包含當前用戶，這是正常的
+            console.warn('在 teamMembers 中暫未找到當前用戶資料，可能正在同步中。');
         }
     };
 

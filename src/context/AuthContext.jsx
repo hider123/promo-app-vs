@@ -6,34 +6,30 @@ const AuthContext = createContext();
 
 export const useAuthContext = () => useContext(AuthContext);
 
-// --- 管理員設定 ---
 const ADMIN_UIDS = import.meta.env.VITE_ADMIN_UIDS
     ? import.meta.env.VITE_ADMIN_UIDS.split(',')
     : [];
 
 export const AuthProvider = ({ children }) => {
-    // a. 使用 useAuth Hook 取得最底層的認證狀態
     const { auth, user, userId, appId, isLoading, initError } = useAuth();
-
-    // b. 判斷當前使用者是否為管理員
     const isAdmin = useMemo(() => user ? ADMIN_UIDS.includes(user.uid) : false, [user]);
 
-    // c. [核心邏輯] 將全域提示系統統一放在此處
+    // [還原] 讓 alert 狀態可以儲存回呼函式
     const [alert, setAlert] = useState({ isOpen: false, message: '', onClose: null });
 
+    // [還原] showAlert 可以接收一個回呼函式
     const showAlert = useCallback((message, onCloseCallback = null) => {
         setAlert({ isOpen: true, message, onClose: onCloseCallback });
     }, []);
 
+    // [核心修正] 採用最標準的方式來處理 closeAlert，確保回呼函式永遠是最新的
     const closeAlert = useCallback(() => {
-        if (alert.onClose) {
+        if (alert.onClose && typeof alert.onClose === 'function') {
             alert.onClose();
         }
         setAlert({ isOpen: false, message: '', onClose: null });
-    }, [alert]);
+    }, [alert]); // 將 alert 加入依賴，確保 closeAlert 函式能取到最新的 alert 狀態
 
-
-    // d. 封裝登出邏輯
     const handleSignOut = async () => {
         if (!auth) return;
         try {
@@ -43,7 +39,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // e. 組合所有要廣播出去的 value
     const value = {
         auth,
         user,
@@ -60,4 +55,3 @@ export const AuthProvider = ({ children }) => {
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

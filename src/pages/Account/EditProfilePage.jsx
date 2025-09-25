@@ -1,32 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuthContext } from '../../context/AuthContext.jsx';
 import { useUserContext } from '../../context/UserContext.jsx';
 
 const EditProfilePage = ({ onBack }) => {
-    // 1. 從 Context 取得使用者資訊和功能
-    const { userId, user, showAlert } = useAuthContext();
-    const { updateUserProfile } = useUserContext();
+    const { userId, user } = useAuthContext();
+    const { updateUserProfile, teamMembers } = useUserContext();
     
-    // 2. 使用 state 統一管理所有表單欄位
+    const currentUserProfile = useMemo(() => 
+        (teamMembers || []).find(member => member.userId === userId), 
+    [teamMembers, userId]);
+
     const [formData, setFormData] = useState({
-        username: 'PromoMaster',
-        email: '',
+        username: '',
         phone: '',
         referrerId: ''
     });
     const [copySuccess, setCopySuccess] = useState('');
 
-    // 當 user 物件載入後，更新表單的預設 email (如果有的話)
     useEffect(() => {
-        if (user?.email) {
-            setFormData(prev => ({ ...prev, email: user.email }));
+        if (currentUserProfile) {
+            setFormData(prevData => ({
+                username: prevData.username || currentUserProfile.name || '',
+                phone: prevData.phone || currentUserProfile.phone || '',
+                referrerId: currentUserProfile.referrerId || ''
+            }));
         }
-    }, [user]);
+    }, [currentUserProfile]);
 
-    // 帳戶 ID 直接使用 Firebase 的 UID，確保唯一性
     const accountId = userId;
 
-    // 4. 定義事件處理函式
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({...prev, [name]: value}));
@@ -50,21 +52,14 @@ const EditProfilePage = ({ onBack }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        // [核心檢查機制] 在這裡檢查推薦人 ID 是否與帳戶 ID 相同
-        if (formData.referrerId && formData.referrerId === accountId) {
-            showAlert('您不能將自己設為推薦人。');
-            return; // 如果相同，則中斷儲存流程
-        }
-
-        // 呼叫 Context 中的函式來儲存資料
-        await updateUserProfile(formData);
+        await updateUserProfile({
+            name: formData.username,
+            phone: formData.phone
+        });
     };
 
-    // 統一所有輸入框的樣式
     const inputStyle = "mt-2 block w-full border border-gray-300 rounded-lg shadow-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-lg p-3 bg-gray-100 focus:bg-white transition-colors";
 
-    // 5. 回傳 JSX 結構
     return (
         <div className="p-4">
             <div className="relative flex items-center justify-center mb-8">
@@ -105,7 +100,7 @@ const EditProfilePage = ({ onBack }) => {
                     </div>
                     <div>
                         <label htmlFor="email" className="block text-xl font-bold text-gray-700">電子郵件</label>
-                        <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} className={inputStyle} readOnly/>
+                        <input type="email" id="email" name="email" value={user?.email || ''} className={`${inputStyle} bg-gray-200 text-gray-500 cursor-not-allowed`} readOnly/>
                     </div>
                     <div>
                         <label htmlFor="phone" className="block text-xl font-bold text-gray-700">電話號碼</label>
@@ -117,10 +112,10 @@ const EditProfilePage = ({ onBack }) => {
                             type="text" 
                             id="referrerId"
                             name="referrerId"
-                            value={formData.referrerId} 
-                            onChange={handleChange}
-                            placeholder="請輸入推薦人的帳戶 ID (可選)"
-                            className={inputStyle}
+                            value={formData.referrerId || ''} 
+                            readOnly
+                            placeholder="經由推薦連結註冊後將自動綁定"
+                            className={`${inputStyle} bg-gray-200 text-gray-500 cursor-not-allowed`}
                         />
                     </div>
                 </div>
@@ -136,4 +131,3 @@ const EditProfilePage = ({ onBack }) => {
 };
 
 export default EditProfilePage;
-

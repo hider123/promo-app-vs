@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AuthProvider, useAuthContext } from './context/AuthContext.jsx';
 import { UserProvider } from './context/UserContext.jsx';
 import { AdminProvider } from './context/AdminContext.jsx';
@@ -9,11 +9,13 @@ import AuthPage from './pages/AuthPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage.jsx';
 import AlertModal from './components/AlertModal.jsx';
 
-// [修改] 將所有應用程式邏輯移至此 AppContent 元件中
 const AppContent = () => {
-    // 1. 在這裡使用 Context 是安全的，因為它已經被 AuthProvider 包裹
     const { isLoading, user, auth, initError, isAdmin, handleSignOut, alert, showAlert, closeAlert } = useAuthContext();
     const [hash, setHash] = useState(window.location.hash);
+    
+    // [移除] 移除用於控制登入提示流程的狀態
+    // const [isLoginMessagePending, setIsLoginMessagePending] = useState(false);
+    // const lastProcessedSignIn = useRef(null);
 
     useEffect(() => {
         const handleHashChange = () => setHash(window.location.hash);
@@ -21,23 +23,12 @@ const AppContent = () => {
         return () => window.removeEventListener('hashchange', handleHashChange);
     }, []);
     
-    // 首次登入歡迎訊息的邏輯
-    useEffect(() => {
-        if (user) {
-            const { creationTime, lastSignInTime } = user.metadata;
-            const isNewUser = new Date(lastSignInTime) - new Date(creationTime) < 5000;
+    // [移除] 移除整個用於顯示登入成功提示的 useEffect 區塊
+    // useEffect(() => { ... }, [user, showAlert, closeAlert]);
 
-            if (isNewUser && !sessionStorage.getItem('welcomeMessageShown')) {
-                showAlert(`👋 歡迎您，${user.email}！\n很高興您的加入。`);
-                sessionStorage.setItem('welcomeMessageShown', 'true');
-            }
-        }
-    }, [user, showAlert]);
-
-    // 渲染主內容的函式
     const renderMainContent = () => {
         if (initError) {
-            return (
+             return (
                 <div className="h-full flex items-center justify-center bg-red-50">
                     <div className="text-center p-8">
                         <i className="fas fa-exclamation-triangle fa-3x text-red-500"></i>
@@ -47,7 +38,7 @@ const AppContent = () => {
                 </div>
             );
         }
-
+        // [修改] 移除 isLoginMessagePending 的判斷
         if (isLoading) {
             return (
                 <div className="h-full flex items-center justify-center bg-gray-50">
@@ -61,6 +52,7 @@ const AppContent = () => {
 
         const isAdminRoute = hash === '#admin';
 
+        // [修改] 移除 isLoginMessagePending 的判斷
         if (user) {
             if (isAdmin) {
                 return isAdminRoute 
@@ -81,7 +73,6 @@ const AppContent = () => {
     return (
         <>
             {renderMainContent()}
-            {/* AlertModal 現在可以安全地從 Context 取得狀態並顯示 */}
             <AlertModal 
                 isOpen={alert.isOpen}
                 onClose={closeAlert}
@@ -91,7 +82,6 @@ const AppContent = () => {
     );
 }
 
-// App 元件現在只負責提供 Context 和基礎結構
 export default function App() {
     return (
         <AuthProvider>

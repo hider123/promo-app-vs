@@ -1,9 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useUserContext } from '../context/UserContext.jsx';
+// [新增] 引入 AuthContext 以使用全域的提示功能
+import { useAuthContext } from '../context/AuthContext.jsx';
 
 const CatPoolPage = ({ onAddAccountClick }) => {
-    // 1. 從 UserContext 取得所需的資料和函式
-    const { poolAccounts, records, showAlert } = useUserContext();
+    // 1. 從各自的 Context 取得所需的資料和函式
+    const { poolAccounts, records } = useUserContext();
+    const { showAlert } = useAuthContext(); // [修改] 從 AuthContext 取得 showAlert
     
     // 2. 管理此頁面自身的 UI 狀態 (目前的頁碼)
     const [currentPage, setCurrentPage] = useState(1);
@@ -69,7 +72,6 @@ const CatPoolPage = ({ onAddAccountClick }) => {
     // 6. 回傳 JSX 結構
     return (
         <div className="relative h-full">
-            {/* [核心修正] 在主要內容容器加入 pb-[var(--tab-bar-height)]，為底部導覽列預留空間 */}
             <div className="space-y-4 p-4 pb-[calc(var(--tab-bar-height)_+_1rem)]">
                 <h1 className="text-3xl font-bold text-gray-800">貓池</h1>
                 <p className="text-gray-600">管理您不同帳號的內容池，快速選用素材與文案。</p>
@@ -160,4 +162,3 @@ const CatPoolPage = ({ onAddAccountClick }) => {
 };
 
 export default CatPoolPage;
-

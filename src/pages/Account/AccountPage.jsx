@@ -5,9 +5,8 @@ import RechargeModal from '../../components/RechargeModal.jsx';
 import WithdrawModal from '../../components/WithdrawModal.jsx';
 
 const AccountPage = ({ onNavigate, setRechargeAmount }) => {
-    // 1. 從 AuthContext 取得 user 和 userId
     const { handleSignOut, user, userId, showAlert } = useAuthContext();
-    const { records, appSettings, handleWithdrawRequest, paymentInfo } = useUserContext();
+    const { records, appSettings, handleWithdrawRequest, paymentInfo, teamMembers } = useUserContext();
     
     const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
     const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -18,6 +17,21 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
         instagram: false,
         tiktok: false,
     });
+
+    const { referrerName, referrerId } = useMemo(() => {
+        if (!teamMembers || !userId) {
+            return { referrerName: '讀取中...', referrerId: null };
+        }
+        const currentUserProfile = teamMembers.find(member => member.userId === userId);
+        if (!currentUserProfile || !currentUserProfile.referrerId) {
+            return { referrerName: '無', referrerId: null };
+        }
+        const referrerProfile = teamMembers.find(member => member.userId === currentUserProfile.referrerId);
+        return {
+            referrerName: referrerProfile ? referrerProfile.name : '未知用戶',
+            referrerId: currentUserProfile.referrerId
+        };
+    }, [teamMembers, userId]);
 
     const totalBalance = (records || []).reduce((sum, r) => sum + (r.amount || 0), 0);
     const catPoolPurchaseCount = useMemo(() => 
@@ -68,14 +82,14 @@ const AccountPage = ({ onNavigate, setRechargeAmount }) => {
                 
                 <div className="bg-white p-5 rounded-xl shadow-sm relative">
                     <h2 className="text-2xl font-bold text-gray-800 mb-5">個人資料</h2>
-                    {/* [修改] 根據您的需求更新此區塊 */}
                     <div className="flex items-center justify-between">
-                        {/* 左側：帳號與 UID */}
                         <div className="flex-1 min-w-0">
                             <p className="font-bold text-2xl text-gray-900 truncate" title={user?.email}>{user?.email || '載入中...'}</p>
                             <p className="text-sm text-gray-500 mt-1 truncate" title={userId}>UID: {userId || '...'}</p>
+                            <p className="text-sm text-gray-500 mt-1">
+                                推薦人: <span className="font-semibold text-gray-700" title={`UID: ${referrerId || ''}`}>{referrerName}</span>
+                            </p>
                         </div>
-                        {/* 右側：階級名稱 */}
                         <div className="flex-shrink-0 ml-4">
                              <span className={`${userLevel.color} text-sm font-semibold px-3 py-1 rounded-full`}>{userLevel.name}</span>
                         </div>

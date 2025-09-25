@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     createUserWithEmailAndPassword, 
     signInWithEmailAndPassword,
@@ -6,7 +6,6 @@ import {
 } from 'firebase/auth';
 import { useAuthContext } from '../context/AuthContext.jsx';
 
-// 卡通風格 Logo
 const CartoonLogo = () => (
     <div className="bg-white p-2 border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] inline-block">
         <svg className="w-12 h-12 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -18,9 +17,7 @@ const CartoonLogo = () => (
     </div>
 );
 
-
 export default function AuthPage() {
-    // [還原] 不再需要 closeAlert
     const { auth, showAlert } = useAuthContext();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
@@ -29,6 +26,15 @@ export default function AuthPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const refId = urlParams.get('ref');
+        if (refId) {
+            sessionStorage.setItem('referrerId', refId);
+            console.log(`已記錄推薦人 ID: ${refId}`);
+        }
+    }, []);
+
     const FontInjector = () => (
         <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap');
@@ -44,6 +50,15 @@ export default function AuthPage() {
 
         setIsLoading(true);
         setError('');
+        
+        if (!isLogin) {
+            const referrerId = sessionStorage.getItem('referrerId');
+            if (!referrerId) {
+                setError('錯誤：您必須透過有效的推薦連結才能註冊。');
+                setIsLoading(false);
+                return;
+            }
+        }
 
         if (!isLogin && password.length < 6) {
             setError('密碼長度至少需要 6 個字元。');
@@ -60,13 +75,11 @@ export default function AuthPage() {
         try {
             if (isLogin) {
                 await signInWithEmailAndPassword(auth, email, password);
-                // 登入成功後，App.jsx 中的 onAuthStateChanged 會自動處理跳轉
             } else {
-                // [還原] 恢復為原始的、正確的註冊 -> 登出流程
                 await createUserWithEmailAndPassword(auth, email, password);
-                await signOut(auth); // 立即登出
+                await signOut(auth);
                 
-                // 顯示成功提示，並在使用者確認後切換到登入介面
+                // 將後續動作作為回呼函式，直接傳遞給 showAlert
                 showAlert(
                     '🎉 註冊成功！\n現在請用您的新帳號登入。',
                     () => {
@@ -85,7 +98,6 @@ export default function AuthPage() {
                 case 'auth/user-not-found':
                 case 'auth/wrong-password':
                 case 'auth/invalid-credential':
-                    // [新增] 針對首次登入可能失敗的情況，提供更明確的提示
                     setError('Email 或密碼錯誤。如果您是新註冊用戶，請稍候 10 秒再試，以便後台為您建立資料。');
                     break;
                 case 'auth/invalid-email':
@@ -103,7 +115,7 @@ export default function AuthPage() {
     return (
         <>
             <FontInjector />
-            <div className="flex items-center justify-center min-h-screen bg-purple-50 font-['Nunito',_sans-serif] p-4 relative overflow-hidden">
+            <div className="flex items-center justify-center min-h-screen bg-purple-50 font-['Nunito',_sans_serif] p-4 relative overflow-hidden">
                 <div className="absolute -top-16 -left-16 w-48 h-48 bg-yellow-200 rounded-full opacity-50"></div>
                 <div className="absolute -bottom-24 -right-12 w-72 h-72 bg-blue-200 rounded-full opacity-50"></div>
 
