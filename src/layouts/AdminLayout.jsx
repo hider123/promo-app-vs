@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useAuthContext } from '../context/AuthContext.jsx';
+import AlertModal from '../components/AlertModal.jsx';
 import AdminPage from '../pages/admin/AdminPage.jsx';
-// [修正] 更新為正確的檔案路徑
 import SettingsPage from '../pages/admin/SettingsPage.jsx';
 import RechargeSettingsPage from '../pages/admin/RechargeSettingsPage.jsx';
 import UsersPage from '../pages/admin/UsersPage.jsx';
+// [移除] 不再需要引入 AdminExperimentPage
 
 const AdminLayout = () => {
-    const { handleSignOut } = useAuthContext();
+    const { handleSignOut, alert, closeAlert } = useAuthContext();
     const [activeTab, setActiveTab] = useState('products');
 
     const renderContent = () => {
@@ -18,6 +19,7 @@ const AdminLayout = () => {
                 return <RechargeSettingsPage />;
             case 'users':
                 return <UsersPage />;
+            // [移除] 移除 experiment 的 case
             case 'products':
             default:
                 return <AdminPage />;
@@ -38,6 +40,7 @@ const AdminLayout = () => {
                             <button onClick={() => setActiveTab('users')} className={`font-semibold ${activeTab === 'users' ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-600'}`}>用戶管理</button>
                             <button onClick={() => setActiveTab('recharge')} className={`font-semibold ${activeTab === 'recharge' ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-600'}`}>充值設定</button>
                             <button onClick={() => setActiveTab('settings')} className={`font-semibold ${activeTab === 'settings' ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-600'}`}>系統設定</button>
+                            {/* [移除] 移除實驗頁面的頁籤按鈕 */}
                         </nav>
                     </div>
                     <button
@@ -51,6 +54,11 @@ const AdminLayout = () => {
                     {renderContent()}
                 </main>
             </div>
+            <AlertModal 
+                isOpen={alert.isOpen}
+                onClose={closeAlert}
+                message={alert.message}
+            />
         </>
     );
 };

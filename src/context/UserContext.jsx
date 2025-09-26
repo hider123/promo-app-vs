@@ -82,28 +82,15 @@ export const UserProvider = ({ children }) => {
         const currentUserInTeam = (teamMembers || []).find(member => member.userId === userId);
         if (currentUserInTeam) {
             try {
-                // 過濾掉值為 undefined 的欄位，避免意外覆蓋
-                const dataToUpdate = Object.entries(profileData).reduce((acc, [key, value]) => {
-                    if (value !== undefined) {
-                        acc[key] = value;
-                    }
-                    return acc;
-                }, {});
-
-                if (Object.keys(dataToUpdate).length > 0) {
-                    await updateData(`artifacts/${appId}/public/data/team_members`, currentUserInTeam.id, dataToUpdate);
-                    // 只有在不是僅更新推薦人ID時才顯示通用成功訊息
-                    if (!('referrerId' in dataToUpdate && Object.keys(dataToUpdate).length === 1)) {
-                         showAlert('✅ 個人資料已成功儲存！');
-                    }
-                }
+                const dataToUpdate = { ...profileData };
+                await updateData(`artifacts/${appId}/public/data/team_members`, currentUserInTeam.id, dataToUpdate);
+                showAlert('個人資料已成功儲存！');
             } catch (error) {
                 console.error("更新個人資料失敗:", error);
                 showAlert('儲存失敗，請稍後再試。');
             }
         } else {
-             // 首次登入時，teamMembers 可能尚未包含當前用戶，這是正常的
-            console.warn('在 teamMembers 中暫未找到當前用戶資料，可能正在同步中。');
+            showAlert('錯誤：在團隊中找不到您的資料。');
         }
     };
 

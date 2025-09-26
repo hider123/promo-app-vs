@@ -8,16 +8,17 @@ import {
 } from '../data/mockData';
 
 export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onInitialLoadComplete) => {
-    // 1. 為每個資料集合建立對應的 state
     const [appSettings, setAppSettings] = useState(null);
     const [products, setProducts] = useState([]);
     const [poolAccounts, setPoolAccounts] = useState([]);
     const [teamMembers, setTeamMembers] = useState([]);
     const [pendingInvitations, setPendingInvitations] = useState([]);
     const [records, setRecords] = useState([]);
-    const [allUsers, setAllUsers] = useState([]);
+    const [paymentInfo, setPaymentInfo] = useState(null);
+    const [allTeamMembers, setAllTeamMembers] = useState([]);
+    const [allPoolAccounts, setAllPoolAccounts] = useState([]);
+    const [allUserRecords, setAllUserRecords] = useState([]);
 
-    // 2. 使用 useEffect 來處理副作用（設定監聽器）
     useEffect(() => {
         if (!isReadyToListen) {
             return () => {};
@@ -25,7 +26,7 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
 
         const allListeners = [
             // --- 公開資料 (Public Data) ---
-            { name: 'app_settings', setter: setAppSettings, initialData: [{ id: 'global', catPoolPrice: 5.00, commissionRate: 0.05, copyPushCommission: 1.50, copyPushLimit: 3, midTierThreshold: 20, highTierThreshold: 100, buyInRate: 7.5, sellOutRate: 7.0 }], isPublic: true, scope: ['user', 'admin'], isSingleDoc: true, docId: 'global', seedOnEmpty: true },
+            { name: 'app_settings', setter: setAppSettings, isPublic: true, scope: ['user', 'admin'], isSingleDoc: true, docId: 'global' },
             { 
                 name: 'products', 
                 setter: setProducts, 
@@ -33,26 +34,46 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
                 scope: ['user', 'admin'],
                 queryConstraints: scope === 'user' ? [where('status', '==', 'published')] : []
             },
-            { name: 'team_members', setter: setTeamMembers, initialData: initialTeamMembersData, isPublic: true, scope: ['user'], seedOnEmpty: true },
-            { name: 'team_invitations', setter: setPendingInvitations, initialData: [], isPublic: true, scope: ['user'], seedOnEmpty: true },
+            // [核心修正] 讓 admin 也能讀取 team_members，並使用正確的 state setter
+            { 
+                name: 'team_members', 
+                setter: scope === 'admin' ? setAllTeamMembers : setTeamMembers, 
+                isPublic: true, 
+                scope: ['user', 'admin'] 
+            },
+            { name: 'team_invitations', setter: setPendingInvitations, isPublic: true, scope: ['user'] },
             
             // --- 私人資料 (Private Data) ---
-            { name: 'poolAccounts', setter: setPoolAccounts, initialData: initialPoolAccountsData, isPublic: false, scope: ['user'], seedOnEmpty: true },
-            { name: 'records', setter: setRecords, initialData: initialRecordsData, isPublic: false, scope: ['user'], seedOnEmpty: true },
-
-            // --- 管理員資料 (僅限 'admin' scope) ---
+            { name: 'poolAccounts', setter: setPoolAccounts, isPublic: false, scope: ['user'] },
+            { name: 'records', setter: setRecords, isPublic: false, scope: ['user'] },
             { 
-                name: 'users', 
-                setter: setAllUsers, 
-                isPublic: true, // 'users' 集合是公開的
+                name: 'private', 
+                setter: setPaymentInfo, 
+                isPublic: false, 
+                scope: ['user'], 
+                isSingleDoc: true, 
+                docId: 'payment_info'
+            },
+
+            // --- 集合群組 (僅限 'admin' scope) ---
+            { 
+                name: 'poolAccounts', 
+                setter: setAllPoolAccounts, 
+                isPublic: false, 
                 scope: ['admin'], 
-                isCollectionGroup: false, // 這是一個頂層集合
-                queryConstraints: [] // 獲取所有用戶
+                isCollectionGroup: true,
+            },
+            { 
+                name: 'records', 
+                setter: setAllUserRecords, 
+                isPublic: false, 
+                scope: ['admin'], 
+                isCollectionGroup: true,
+                queryConstraints: [where('type', '==', 'commission')]
             },
         ];
         
         const listenersToSetup = allListeners.filter(l => l.scope.includes(scope));
-
         const unsubscribers = setupListeners(appId, userId, listenersToSetup, onInitialLoadComplete);
 
         return () => {
@@ -62,6 +83,5 @@ export const useFirestoreListeners = (scope, appId, userId, isReadyToListen, onI
         };
     }, [scope, isReadyToListen, userId, appId, onInitialLoadComplete]);
 
-    // 3. 回傳所有資料狀態
-    return { appSettings, products, poolAccounts, teamMembers, pendingInvitations, records, allUsers };
+    return { appSettings, products, poolAccounts, teamMembers, pendingInvitations, records, paymentInfo, allTeamMembers, allPoolAccounts, allUserRecords };
 };

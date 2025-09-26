@@ -2,99 +2,133 @@ import React, { useMemo, useCallback } from 'react';
 import { useAdminContext } from '../../context/AdminContext.jsx';
 
 const UsersPage = () => {
-    // 1. 從 AdminContext 取得所有用戶的資料
-    const { allTeamMembers, allPoolAccounts, allUserRecords, appSettings } = useAdminContext();
+    const { allTeamMembers, allPoolAccounts, allUserRecords, appSettings, handleToggleUserStatus, allAuthUsers } = useAdminContext();
 
-    // 2. 定義輔助函式
     const getUserLevel = useCallback((purchaseCount) => {
         const highTier = appSettings?.highTierThreshold ?? 100;
         const midTier = appSettings?.midTierThreshold ?? 20;
 
-        if (purchaseCount >= highTier) return '品牌大使(高階)';
-        if (purchaseCount >= midTier) return '行銷達人(中階)';
-        return '推廣新星(初階)';
+        if (purchaseCount >= highTier) return '品牌大使(高阶)';
+        if (purchaseCount >= midTier) return '行销达人(中阶)';
+        return '推广新星(初阶)';
     }, [appSettings]);
 
-    // 3. 計算每位用戶的統計數據
     const userStats = useMemo(() => {
+        if (!allTeamMembers || allTeamMembers.length === 0 || !allAuthUsers || allAuthUsers.length === 0) return [];
+        
+        const authUserMap = new Map();
+        allAuthUsers.forEach(u => authUserMap.set(u.uid, u.email));
+
+        const visibleMembers = allTeamMembers; // 预设显示所有成员，透过 UI 标示隐藏状态
+
         const stats = {};
         const memberMap = new Map();
 
-        // [核心修正] 初始化時，處理所有成員，不再依賴 userId
-        (allTeamMembers || []).forEach(member => {
-            // 使用 Firestore document ID 作為唯一的 key
-            stats[member.id] = {
-                ...member,
-                poolAccountCount: 0,
-                pushCount: 0,
-                commissionTotal: 0,
-            };
-            // 如果有 userId，才將其加入到 map 中，用於後續的推薦人名稱查找
+        visibleMembers.forEach(member => {
             if (member.userId) {
-                memberMap.set(member.userId, member.name);
+                stats[member.userId] = {
+                    ...member,
+                    email: authUserMap.get(member.userId) || '未知 Email',
+                    poolAccountCount: 0,
+                    commissionTotal: 0,
+                };
+                memberMap.set(member.userId, authUserMap.get(member.userId) || member.name);
             }
         });
         
         (allPoolAccounts || []).forEach(account => {
-            const userId = account.userId;
-            // 找到對應的 user stats 物件（可能有多個 team member 文件對應同一個 user）
-            const userStatEntry = Object.values(stats).find(s => s.userId === userId);
-            if (userStatEntry) {
-                userStatEntry.poolAccountCount += 1;
+            if (stats[account.userId]) {
+                stats[account.userId].poolAccountCount += 1;
             }
         });
         
         (allUserRecords || []).forEach(record => {
-            const userId = record.userId;
-            const userStatEntry = Object.values(stats).find(s => s.userId === userId);
-            if (userStatEntry) {
-                userStatEntry.pushCount += 1;
-                userStatEntry.commissionTotal += record.amount;
+            if (stats[record.userId]) {
+                stats[record.userId].commissionTotal += (record.amount || 0);
             }
         });
 
-        // 最終處理：計算階級和推薦人名稱
         return Object.values(stats).map(user => ({
             ...user,
             tier: getUserLevel(user.poolAccountCount),
-            referrerName: user.referrerId ? memberMap.get(user.referrerId) || '未知' : '-',
+            referrerName: user.referrerId ? memberMap.get(user.referrerId) || '未知' : '无',
         }));
-    }, [allTeamMembers, allPoolAccounts, allUserRecords, getUserLevel]);
+    }, [allTeamMembers, allPoolAccounts, allUserRecords, getUserLevel, allAuthUsers]);
 
     return (
         <div className="p-4 space-y-6">
-            <h1 className="text-3xl font-bold text-gray-800">用戶管理</h1>
+            <h1 className="text-3xl font-bold text-gray-800">用户管理</h1>
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                 <table className="w-full text-sm text-left text-gray-500">
                     <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>
-                            <th scope="col" className="px-6 py-3">用戶</th>
-                            <th scope="col" className="px-6 py-3">階級</th>
-                            <th scope="col" className="px-6 py-3">推薦人</th>
-                            <th scope="col" className="px-6 py-3">總佣金</th>
+                            <th scope="col" className="px-6 py-3">用户</th>
+                            <th scope="col" className="px-6 py-3">阶级</th>
+                            <th scope="col" className="px-6 py-3">推荐人</th>
+                            <th scope="col" className="px-6 py-3">总佣金</th>
+                            <th scope="col" className="px-6 py-3">状态</th>
                             <th scope="col" className="px-6 py-3">操作</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {userStats.map(user => (
-                            <tr key={user.id} className="bg-white border-b hover:bg-gray-50">
-                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
-                                    <div className="flex items-center">
-                                        <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full mr-4" />
+                        {userStats.length > 0 ? userStats.map(user => {
+                            const isFrozen = user.accountStatus === 'frozen';
+                            const isVisible = user.isVisible !== false;
+
+                            return (
+                                <tr key={user.id} className={`bg-white border-b hover:bg-gray-50 ${!isVisible ? 'bg-gray-100 opacity-60' : ''}`}>
+                                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                                        {/* [核心修改] 移除 img 图示 */}
                                         <div>
-                                            <p>{user.name}</p>
-                                            <p className="text-xs text-gray-500">{user.userId || '尚未註冊'}</p>
+                                            <p className={`${isFrozen ? 'text-gray-400 line-through' : ''}`}>{user.email}</p>
+                                            <p className="text-xs text-gray-500">{user.userId}</p>
                                         </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">{user.tier}</td>
-                                <td className="px-6 py-4">{user.referrerName}</td>
-                                <td className="px-6 py-4">US$ {user.commissionTotal.toFixed(2)}</td>
-                                <td className="px-6 py-4">
-                                    <button className="font-medium text-indigo-600 hover:underline">查看詳情</button>
+                                    </td>
+                                    <td className="px-6 py-4">{user.tier}</td>
+                                    <td className="px-6 py-4">{user.referrerName}</td>
+                                    <td className="px-6 py-4">US$ {user.commissionTotal.toFixed(2)}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-1">
+                                            {isFrozen && (
+                                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                    已冻结
+                                                </span>
+                                            )}
+                                            {!isVisible && (
+                                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-800">
+                                                    已隐藏
+                                                </span>
+                                            )}
+                                            {!isFrozen && isVisible && (
+                                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                                    正常
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 space-x-2">
+                                        <button 
+                                            onClick={() => handleToggleUserStatus(user.id, user.userId, 'toggleFreeze')}
+                                            className={`font-medium ${isFrozen ? 'text-green-600 hover:underline' : 'text-yellow-600 hover:underline'}`}
+                                        >
+                                            {isFrozen ? '解冻' : '冻结'}
+                                        </button>
+                                        <button 
+                                            onClick={() => handleToggleUserStatus(user.id, user.userId, 'toggleVisibility')}
+                                            className={`font-medium ${isVisible ? 'text-gray-500 hover:underline' : 'text-blue-600 hover:underline'}`}
+                                        >
+                                            {isVisible ? '隐藏' : '显示'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        }) : (
+                            <tr>
+                                <td colSpan="6" className="text-center py-10 text-gray-500">
+                                    <p>目前没有使用者资料可显示。</p>
                                 </td>
                             </tr>
-                        ))}
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -103,4 +137,3 @@ const UsersPage = () => {
 };
 
 export default UsersPage;
-

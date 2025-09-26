@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useCallback, useState } from 'react';
+import React, { createContext, useContext, useCallback, useState, useEffect } from 'react';
 import { useAuthContext } from './AuthContext.jsx';
 import { useFirestoreListeners } from '../hooks/useFirestoreListeners.js';
+// [新增] 直接引入最底層的 Firebase 工具
+import { getFirestore, collection, onSnapshot } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { addData, updateData, deleteData, uploadBase64AsFile } from '../firebase/config';
 
 const AdminContext = createContext();
@@ -8,7 +11,64 @@ export const useAdminContext = () => useContext(AdminContext);
 
 export const AdminProvider = ({ children }) => {
     const { appId, user, showAlert } = useAuthContext();
-    const { products, appSettings, allUsers } = useFirestoreListeners('admin', appId, user?.uid, !!user, useCallback(() => {}, []));
+    
+    // 1. 讓 useFirestoreListeners 負責讀取除了 team_members 以外的其他後台資料
+    const { products, appSettings, allUserRecords, allPoolAccounts } = useFirestoreListeners('admin', appId, user?.uid, !!user, useCallback(() => {}, []));
+
+    // 2. 新增 state 來分別存放 Firestore 和 Auth 的使用者資料
+    const [allTeamMembers, setAllTeamMembers] = useState([]);
+    const [allAuthUsers, setAllAuthUsers] = useState([]);
+    
+    // 3. [核心修正] 讓 AdminContext 自己負責「即時監聽」 allTeamMembers
+    useEffect(() => {
+        // 確保 appId 和 user 都已準備好
+        if (!appId || !user) return;
+
+        const db = getFirestore();
+        const membersRef = collection(db, `artifacts/${appId}/public/data/team_members`);
+        
+        // 使用 onSnapshot 來建立即時監聽，任何資料庫的變動都會立刻反應在後台
+        const unsubscribe = onSnapshot(membersRef, (querySnapshot) => {
+            const membersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setAllTeamMembers(membersData);
+            console.log("[AdminContext] 已更新 team_members:", membersData);
+        }, (error) => {
+            console.error("[AdminContext] 監聽 team_members 失敗:", error);
+            showAlert(`讀取用戶列表失敗: ${error.message}`);
+        });
+
+        // [新增] 同時，呼叫後端函式取得所有使用者的 Email
+        const fetchAllAuthUsers = async () => {
+            try {
+                const functions = getFunctions();
+                const getAllUsersFunction = httpsCallable(functions, 'getAllAuthUsers');
+                const result = await getAllUsersFunction();
+                setAllAuthUsers(result.data.users);
+            } catch (error) {
+                console.error("[AdminContext] 取得所有認證使用者失敗:", error);
+                showAlert(`讀取使用者 Email 列表失敗: ${error.message}`);
+            }
+        };
+        fetchAllAuthUsers();
+
+        // 當元件卸載時，自動取消監聽以節省資源
+        return () => unsubscribe();
+        
+    }, [appId, user, showAlert]);
+
+    // 4. 呼叫後端函式來更新使用者狀態 (凍結/隱藏)
+    const handleToggleUserStatus = useCallback(async (docId, uid, action) => {
+        showAlert('正在處理請求...');
+        try {
+            const functions = getFunctions();
+            const toggleFunction = httpsCallable(functions, 'toggleUserStatus');
+            const result = await toggleFunction({ docId, uid, action });
+            showAlert(result.data.message);
+        } catch (error) {
+            console.error("更新使用者狀態失敗:", error);
+            showAlert(`操作失敗: ${error.message}`);
+        }
+    }, [showAlert]);
 
     const handleUpdateSettings = async (newSettings) => {
         if (!appId) return;
@@ -22,12 +82,11 @@ export const AdminProvider = ({ children }) => {
     };
 
     const handleAddProduct = async (productData) => {
-        // 這個函式保留給「手動新增」使用
         await handleAddMultipleProducts([productData]);
     };
 
     const handleAddMultipleProducts = async (productsToAdd) => {
-        if (!appId || !productsToAdd || productsToAdd.length === 0) return;
+        if (!appId || !productsToAdd || !productsToAdd.length === 0) return;
         
         showAlert(`正在處理 ${productsToAdd.length} 件商品...`);
 
@@ -110,7 +169,11 @@ export const AdminProvider = ({ children }) => {
     const value = {
         products,
         appSettings,
-        allUsers,
+        allUserRecords,
+        allTeamMembers,
+        allAuthUsers,
+        allPoolAccounts,
+        handleToggleUserStatus,
         handleAddProduct,
         handleAddMultipleProducts,
         handleUpdateProduct,
